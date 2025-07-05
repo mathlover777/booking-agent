@@ -68,7 +68,7 @@ class VibesStack(Stack):
         email_bucket.add_event_notification(
             s3.EventType.OBJECT_CREATED,
             s3n.LambdaDestination(email_processor),
-            s3.NotificationKeyFilter(suffix=".eml")  # Only trigger on .eml files
+            s3.NotificationKeyFilter(prefix="emails/")  # Trigger on all files in emails/ folder
         )
 
         # SES Domain configuration for bhaang.com with automatic DNS setup
@@ -138,10 +138,19 @@ class VibesStack(Stack):
             self, "EmailReceiptRuleSet"
         )
 
+        # Create the receipt rule with specific email addresses
         ses.ReceiptRule(
             self, "EmailReceiptRule",
             rule_set=ses_receipt_rule_set,
-            recipients=["bhaang.com"],
+            recipients=[
+                # Define specific email addresses that will receive emails
+                "info@bhaang.com",
+                "support@bhaang.com", 
+                "bookings@bhaang.com",
+                "contact@bhaang.com",
+                "hello@bhaang.com",
+                # Add more email addresses as needed
+            ],
             actions=[
                 ses_actions.AddHeader(
                     name="X-SES-RECEIPT-RULE",
@@ -154,12 +163,19 @@ class VibesStack(Stack):
                 )
             ],
             scan_enabled=True,
-            tls_policy=ses.TlsPolicy.OPTIONAL
+            tls_policy=ses.TlsPolicy.OPTIONAL,
+            enabled=True  # Ensure the rule is enabled
         )
-
-        # Set the receipt rule set as active (this will be the default active rule set)
-        # Note: CDK automatically sets the first rule set as active
 
         # Output the bucket name and lambda function name
         self.email_bucket_name = email_bucket.bucket_name
         self.email_processor_function_name = email_processor.function_name
+        
+        # Output the configured email addresses for reference
+        self.configured_emails = [
+            "info@bhaang.com",
+            "support@bhaang.com", 
+            "bookings@bhaang.com",
+            "contact@bhaang.com",
+            "hello@bhaang.com"
+        ]
