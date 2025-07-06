@@ -8,6 +8,7 @@ def lambda_handler(event, context):
     Lambda handler for processing emails stored in S3
     """
     print("Email processor lambda triggered")
+    print(f"Event: {json.dumps(event)}")
     
     # Get S3 bucket and key from the event
     s3_bucket = event['Records'][0]['s3']['bucket']['name']
@@ -30,7 +31,7 @@ def lambda_handler(event, context):
     print("=" * 80)
     print("CONVERSATION CONTEXT FOR AI:")
     print("=" * 80)
-    print(json.dumps(conversation_context, indent=2, ensure_ascii=False))
+    print(json.dumps(conversation_context, ensure_ascii=False))
     print("=" * 80)
     
     return {
