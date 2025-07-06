@@ -6,6 +6,7 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone, timedelta
 import logging
 import pytz
+from urllib.parse import quote
 
 # Global variables
 STAGE = os.environ['STAGE']
@@ -19,6 +20,44 @@ GOOGLE_CALENDAR_API_BASE = "https://www.googleapis.com/calendar/v3"
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def get_user_by_email(email: str) -> str:
+    """
+    Fetch a user object from Clerk API by email address.
+    
+    Args:
+        email: Email address to search for
+    
+    Returns:
+        User ID if found
+    
+    Raises:
+        Exception: If no user is found with the given email
+    """
+    try:
+        # URL encode the email address
+        encoded_email = quote(email)
+        url = f"https://api.clerk.com/v1/users?limit=10&offset=0&order_by=-created_at&email_address={encoded_email}"
+        headers = {'Authorization': f'Bearer {_secrets["CLERK_SECRET_KEY"]}'}
+        
+        response = requests.get(url, headers=headers, timeout=30)
+        response.raise_for_status()
+        
+        data = response.json()
+        
+        if not data:
+            raise Exception(f"No user found with email: {email}")
+        
+        # Return the first user's ID (assuming at most one return as specified)
+        return data[0]["id"]
+        
+    except requests.exceptions.HTTPError as e:
+        logger.error(f"HTTP error getting user by email {email}: {e}")
+        raise Exception(f"Failed to fetch user by email: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error getting user by email {email}: {e}")
+        raise Exception(f"Failed to fetch user by email: {str(e)}")
 
 
 def get_google_oauth_token(user_id: str) -> Optional[str]:
