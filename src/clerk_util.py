@@ -22,6 +22,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+
 def get_user_by_email(email: str) -> str:
     """
     Fetch a user object from Clerk API by email address.
@@ -449,3 +450,129 @@ def cancel_event(owner_email: str, event_id: str, notify_attendees: bool = True)
     except Exception as e:
         logger.error(f"Error in cancel_event for {owner_email}: {e}")
         raise Exception(f"Failed to cancel event for {owner_email}: {str(e)}") 
+
+
+# Calendar Tool Schemas for OpenAI Responses API
+CALENDAR_TOOLS = [
+    {
+        "type": "function",
+        "name": "get_availability",
+        "description": "Fetch calendar availability for a given date range using email address",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "owner_email": {
+                    "type": "string",
+                    "description": "Email address of the calendar owner"
+                },
+                "start_date": {
+                    "type": "string",
+                    "description": "Start date in YYYY-MM-DD format (e.g., '2024-01-01')"
+                },
+                "end_date": {
+                    "type": "string",
+                    "description": "End date in YYYY-MM-DD format (e.g., '2024-01-31')"
+                }
+            },
+            "required": ["owner_email", "start_date", "end_date"]
+        }
+    },
+    {
+        "type": "function",
+        "name": "book_event",
+        "description": "Book an event in the calendar using email address",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "owner_email": {
+                    "type": "string",
+                    "description": "Email address of the calendar owner"
+                },
+                "date": {
+                    "type": "string",
+                    "description": "Date in YYYY-MM-DD format (e.g., '2024-01-01')"
+                },
+                "start_time": {
+                    "type": "string",
+                    "description": "Start time in military format (e.g., '14:30' for 2:30 PM)"
+                },
+                "end_time": {
+                    "type": "string",
+                    "description": "End time in military format (e.g., '15:30' for 3:30 PM)"
+                },
+                "title": {
+                    "type": "string",
+                    "description": "Event title"
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Event description",
+                    "default": ""
+                },
+                "attendees": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "List of attendee email addresses"
+                },
+                "location": {
+                    "type": "string",
+                    "description": "Event location",
+                    "default": ""
+                },
+                "reminders": {
+                    "type": "object",
+                    "description": "Reminder settings (optional)",
+                    "properties": {
+                        "useDefault": {
+                            "type": "boolean",
+                            "description": "Whether to use default reminders"
+                        },
+                        "overrides": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "method": {
+                                        "type": "string",
+                                        "enum": ["email", "popup"]
+                                    },
+                                    "minutes": {
+                                        "type": "integer",
+                                        "description": "Minutes before event"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "required": ["owner_email", "date", "start_time", "end_time", "title"]
+        }
+    },
+    {
+        "type": "function",
+        "name": "cancel_event",
+        "description": "Cancel/delete an event from the calendar using email address",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "owner_email": {
+                    "type": "string",
+                    "description": "Email address of the calendar owner"
+                },
+                "event_id": {
+                    "type": "string",
+                    "description": "Google Calendar event ID"
+                },
+                "notify_attendees": {
+                    "type": "boolean",
+                    "description": "Whether to notify attendees about the cancellation",
+                    "default": True
+                }
+            },
+            "required": ["owner_email", "event_id"]
+        }
+    }
+]

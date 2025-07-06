@@ -2,16 +2,18 @@
 """
 Test script to simulate Lambda email processing locally
 """
+from dotenv import load_dotenv
+load_dotenv('../.env.base')
+load_dotenv('../.env.dev')
 
 import json
 import boto3
 import os
-from dotenv import load_dotenv
+
 from email_processor import lambda_handler
-from clerk_util import get_google_oauth_token
 
 # Load environment variables from .env.base (relative to project root)
-load_dotenv('../.env.base')
+
 
 
 def test_email_processing(s3_key: str):
@@ -71,49 +73,6 @@ def test_email_processing(s3_key: str):
         return False
 
 
-def test_clerk_oauth_token(user_id: str = None):
-    """
-    Test Clerk OAuth token retrieval
-    """
-    if user_id is None:
-        user_id = "user_2zTBVQZOK5QCyxL43QTVOHOw3zK"  # Hardcoded for dev testing
-    
-    print(f"🧪 Testing Clerk OAuth Token Retrieval")
-    print(f"👤 User ID: {user_id}")
-    print(f"🌍 Stage: {os.getenv('STAGE', 'dev')}")
-    print("=" * 80)
-    
-    try:
-        # Call the Clerk utility function
-        token_data = get_google_oauth_token(user_id)
-        
-        print("\n✅ OAuth token retrieval completed successfully!")
-        
-        # Parse and pretty print the response
-        print("\n📋 TOKEN DATA:")
-        print(json.dumps(token_data, indent=2, ensure_ascii=False))
-        
-        # Extract useful information
-        if 'data' in token_data and len(token_data['data']) > 0:
-            token_info = token_data['data'][0]
-            print(f"\n🔑 Token ID: {token_info.get('id', 'N/A')}")
-            print(f"📅 Created: {token_info.get('created_at', 'N/A')}")
-            print(f"📅 Updated: {token_info.get('updated_at', 'N/A')}")
-            print(f"🏷️ Provider: {token_info.get('provider', 'N/A')}")
-            print(f"👤 User ID: {token_info.get('user_id', 'N/A')}")
-            
-            # Check if token has scopes
-            if 'scopes' in token_info:
-                print(f"🔍 Scopes: {', '.join(token_info['scopes'])}")
-        
-        return True
-        
-    except Exception as e:
-        print(f"\n❌ Error retrieving OAuth token: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
-
 
 def main():
     """
@@ -146,21 +105,12 @@ def main():
     print("📧 TESTING EMAIL PROCESSING")
     print("="*80)
     email_success = test_email_processing(s3_key)
+
     
-    # Run the Clerk OAuth token test
-    print("\n" + "="*80)
-    print("🔐 TESTING CLERK OAUTH TOKEN")
-    print("="*80)
-    oauth_success = test_clerk_oauth_token()
-    
-    if email_success and oauth_success:
-        print("\n🎉 All tests completed successfully!")
+    if email_success:
+        print("\n🎉 Email processing test completed successfully!")
     else:
-        print("\n💥 Some tests failed!")
-        if not email_success:
-            print("❌ Email processing test failed")
-        if not oauth_success:
-            print("❌ OAuth token test failed")
+        print("\n💥 Email processing test failed!")
         sys.exit(1)
 
 

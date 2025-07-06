@@ -37,10 +37,12 @@ You are a calendar assistant that interacts via email threads. Your goals:
        "owner_email": "...",
        "action": "...",
        "email_response": "...",
+       "email_ids": ["email1@example.com", "email2@example.com"],
        // optional: tool call info from API
      }}
      ```
    - If using function calling, include the `function_call` object exactly as returned by API.
+   - Include all email addresses found in the email thread in the `email_ids` array.
 
 5. **Example**:
     USER: Could you share your availability next week?
