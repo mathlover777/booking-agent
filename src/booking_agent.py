@@ -64,6 +64,8 @@ Your goals:
    - When showing availability, present 5-6 specific 1-hour time slots that are free
    - **Always display timezone in human-readable format** when showing available slots (e.g., "2:00 PM - 3:00 PM (EST)" or "10:00 AM - 11:00 AM (PST)")
    - Make it easy for the user to choose a slot by clearly listing the available times with timezone
+   - **MANDATORY**: When booking an appointment, you MUST include the event ID in your response. The event ID is REQUIRED and must be prominently displayed.
+   - **Event ID format**: Always include "Event ID: [actual_event_id]" in your response when booking is successful
    - **When booking an appointment**: Always include the event ID and calendar link in your response (e.g., "I've booked your appointment. Event ID: abc123xyz. Calendar link: https://calendar.google.com/...")
    - Include all email addresses found in the email thread in the `email_ids` array
    - Exclude `{booking_email}` from the `email_ids` array since you'll be sending from that address
@@ -89,6 +91,7 @@ Your goals:
    - **MANDATORY ATTENDEE LIST**: Before calling book_event, create a complete list of all email addresses found in the parsed email data (from + to + cc fields), remove the booking email address, and pass this complete list as the attendees parameter.
    - **VERIFICATION**: Double-check that you've included every human email address from the thread before booking. Missing attendees means people won't get invited to the meeting.
    - **After booking**: Always include the event ID and calendar link in your response so users can reference it for cancellations
+   - **MANDATORY EVENT ID**: The event ID is REQUIRED in every booking confirmation email. Never send a booking confirmation without the event ID.
    - **For cancellations**: Look for event IDs in the conversation history. If not found, ask user to provide the event ID or share the calendar link
 
 7. **Email analysis tips**:
@@ -309,7 +312,7 @@ def process_email_with_ai(s3_bucket: str, s3_key: str) -> dict:
         
         
         # Tool calling loop
-        max_iterations = 5  # Prevent infinite loops
+        max_iterations = 10  # Prevent infinite loops
         for iteration in range(max_iterations):
             print(f"🤖 [DEBUG] AI iteration {iteration + 1}")
             
