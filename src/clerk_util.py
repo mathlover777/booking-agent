@@ -3,8 +3,9 @@ import boto3
 import os
 import requests
 from typing import Dict, Any, List, Optional
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import logging
+import pytz
 
 # Global variables
 STAGE = os.environ['STAGE']
@@ -37,15 +38,40 @@ def get_google_oauth_token(user_id: str) -> Optional[str]:
         return None
 
 
-def fetch_availability(user_id: str, oauth_token: str, start_timestamp: str, end_timestamp: str) -> Dict[str, Any]:
+def get_user_timezone(user_id: str, oauth_token: str) -> str:
     """
-    Fetch user's calendar availability for a given time range.
+    Get the user's calendar timezone.
     
     Args:
         user_id: User identifier
         oauth_token: Google OAuth access token
-        start_timestamp: Start time in ISO format (e.g., "2024-01-01T00:00:00Z")
-        end_timestamp: End time in ISO format (e.g., "2024-01-01T23:59:59Z")
+    
+    Returns:
+        Timezone identifier (e.g., "America/New_York")
+    """
+    try:
+        calendar_url = f"{GOOGLE_CALENDAR_API_BASE}/calendars/primary"
+        headers = {'Authorization': f'Bearer {oauth_token}'}
+        
+        response = requests.get(calendar_url, headers=headers, timeout=30)
+        response.raise_for_status()
+        
+        calendar_data = response.json()
+        return calendar_data.get('timeZone', 'UTC')
+        
+    except Exception as e:
+        logger.error(f"Error getting timezone for user {user_id}: {e}")
+        return 'UTC'  # Fallback to UTC
+
+
+def fetch_availability(user_id: str, start_date: str, end_date: str) -> Dict[str, Any]:
+    """
+    Fetch user's calendar availability for a given date range.
+    
+    Args:
+        user_id: User identifier
+        start_date: Start date in YYYY-MM-DD format (e.g., "2024-01-01")
+        end_date: End date in YYYY-MM-DD format (e.g., "2024-01-31")
     
     Returns:
         Dict containing:
@@ -54,6 +80,23 @@ def fetch_availability(user_id: str, oauth_token: str, start_timestamp: str, end
         - available_slots: List of available time slots (simplified)
     """
     try:
+        # Get OAuth token internally
+        oauth_token = get_google_oauth_token(user_id)
+        if not oauth_token:
+            raise Exception("Could not retrieve Google OAuth token for user")
+        
+        # Get user's timezone
+        user_timezone = get_user_timezone(user_id, oauth_token)
+        
+        # Convert dates to timestamps in user's timezone
+        # Start of day in user's timezone
+        start_datetime = datetime.strptime(start_date, "%Y-%m-%d")
+        start_timestamp = start_datetime.replace(tzinfo=timezone.utc).isoformat()
+        
+        # End of day in user's timezone (next day at 00:00)
+        end_datetime = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
+        end_timestamp = end_datetime.replace(tzinfo=timezone.utc).isoformat()
+        
         # Get user's primary calendar
         calendar_url = f"{GOOGLE_CALENDAR_API_BASE}/calendars/primary"
         headers = {'Authorization': f'Bearer {oauth_token}'}
@@ -97,9 +140,9 @@ def fetch_availability(user_id: str, oauth_token: str, start_timestamp: str, end
             'events': formatted_events,
             'timezone': timezone_id,
             'total_events': len(formatted_events),
-            'time_range': {
-                'start': start_timestamp,
-                'end': end_timestamp
+            'date_range': {
+                'start_date': start_date,
+                'end_date': end_date
             }
         }
         
@@ -110,9 +153,10 @@ def fetch_availability(user_id: str, oauth_token: str, start_timestamp: str, end
 
 def book_event(
     user_id: str, 
-    oauth_token: str, 
-    start_timestamp: str, 
-    end_timestamp: str, 
+    start_date: str,
+    start_time: str,
+    end_date: str,
+    end_time: str,
     title: str,
     description: str = "",
     attendees: List[str] = None,
@@ -124,9 +168,10 @@ def book_event(
     
     Args:
         user_id: User identifier
-        oauth_token: Google OAuth access token
-        start_timestamp: Start time in ISO format
-        end_timestamp: End time in ISO format
+        start_date: Start date in YYYY-MM-DD format (e.g., "2024-01-01")
+        start_time: Start time in military format (e.g., "14:30" for 2:30 PM)
+        end_date: End date in YYYY-MM-DD format (e.g., "2024-01-01")
+        end_time: End time in military format (e.g., "15:30" for 3:30 PM)
         title: Event title
         description: Event description
         attendees: List of attendee email addresses
@@ -137,6 +182,31 @@ def book_event(
         Dict containing the created event details
     """
     try:
+        # Get OAuth token internally
+        oauth_token = get_google_oauth_token(user_id)
+        if not oauth_token:
+            raise Exception("Could not retrieve Google OAuth token for user")
+        
+        # Get user's timezone
+        user_timezone = get_user_timezone(user_id, oauth_token)
+        
+        # Convert date and time to datetime in user's timezone
+        start_datetime_str = f"{start_date}T{start_time}:00"
+        end_datetime_str = f"{end_date}T{end_time}:00"
+        
+        # Parse datetime as if it's in user's timezone
+        start_datetime = datetime.strptime(start_datetime_str, "%Y-%m-%dT%H:%M:%S")
+        end_datetime = datetime.strptime(end_datetime_str, "%Y-%m-%dT%H:%M:%S")
+        
+        # Create timezone-aware datetime in user's timezone
+        user_tz = pytz.timezone(user_timezone)
+        start_datetime_tz = user_tz.localize(start_datetime)
+        end_datetime_tz = user_tz.localize(end_datetime)
+        
+        # Convert to UTC timestamps for Google Calendar API
+        start_timestamp = start_datetime_tz.astimezone(pytz.UTC).isoformat()
+        end_timestamp = end_datetime_tz.astimezone(pytz.UTC).isoformat()
+        
         # Default reminder settings (follow Google Calendar best practices)
         default_reminders = {
             'useDefault': False,
@@ -156,11 +226,11 @@ def book_event(
             'description': description,
             'start': {
                 'dateTime': start_timestamp,
-                'timeZone': 'UTC'  # Will be converted to user's timezone
+                'timeZone': user_timezone
             },
             'end': {
                 'dateTime': end_timestamp,
-                'timeZone': 'UTC'
+                'timeZone': user_timezone
             },
             'reminders': event_reminders
         }
@@ -202,7 +272,8 @@ def book_event(
             'location': created_event.get('location'),
             'attendees': [attendee.get('email') for attendee in created_event.get('attendees', [])],
             'html_link': created_event.get('htmlLink'),
-            'status': created_event.get('status')
+            'status': created_event.get('status'),
+            'timezone': user_timezone
         }
         
     except Exception as e:
@@ -210,13 +281,12 @@ def book_event(
         raise Exception(f"Failed to book event: {str(e)}")
 
 
-def cancel_event(user_id: str, oauth_token: str, event_id: str, notify_attendees: bool = True) -> Dict[str, Any]:
+def cancel_event(user_id: str, event_id: str, notify_attendees: bool = True) -> Dict[str, Any]:
     """
     Cancel/delete an event from the user's Google Calendar.
     
     Args:
         user_id: User identifier
-        oauth_token: Google OAuth access token
         event_id: Google Calendar event ID
         notify_attendees: Whether to notify attendees about the cancellation
     
@@ -224,6 +294,11 @@ def cancel_event(user_id: str, oauth_token: str, event_id: str, notify_attendees
         Dict containing cancellation status
     """
     try:
+        # Get OAuth token internally
+        oauth_token = get_google_oauth_token(user_id)
+        if not oauth_token:
+            raise Exception("Could not retrieve Google OAuth token for user")
+        
         events_url = f"{GOOGLE_CALENDAR_API_BASE}/calendars/primary/events/{event_id}"
         headers = {'Authorization': f'Bearer {oauth_token}'}
         params = {'sendUpdates': 'all' if notify_attendees else 'none'}
@@ -249,6 +324,7 @@ def cancel_event(user_id: str, oauth_token: str, event_id: str, notify_attendees
         raise Exception(f"Failed to cancel event: {str(e)}")
 
 
+# Keep the old function for backward compatibility
 def get_calendar_timezone(user_id: str, oauth_token: str) -> str:
     """
     Get the user's calendar timezone.

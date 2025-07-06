@@ -26,26 +26,14 @@ def test_get_bookings():
     
     print("=== Test 1: Getting Calendar Bookings ===\n")
     
-    # Get OAuth token
-    oauth_token = get_google_oauth_token(user_id)
-    if not oauth_token:
-        print("❌ Failed to get OAuth token")
-        return
-    
-    # Get timezone
-    timezone_id = get_calendar_timezone(user_id, oauth_token)
-    print(f"User timezone: {timezone_id}")
-    
-    # Fetch availability for next week
-    start_time = datetime.now() + timedelta(days=1)
-    end_time = start_time + timedelta(days=7)
-    
-    start_iso = start_time.isoformat() + 'Z'
-    end_iso = end_time.isoformat() + 'Z'
+    # Calculate date range for next week
+    start_date = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+    end_date = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d")
     
     try:
-        availability = fetch_availability(user_id, oauth_token, start_iso, end_iso)
-        print(f"Found {availability['total_events']} events in the next week")
+        availability = fetch_availability(user_id, start_date, end_date)
+        print(f"User timezone: {availability['timezone']}")
+        print(f"Found {availability['total_events']} events from {start_date} to {end_date}")
         
         if availability['events']:
             print("\nEvents:")
@@ -53,7 +41,7 @@ def test_get_bookings():
                 event_id = event.get('id', 'No ID')
                 print(f"- {event['title']} ({event['start']} to {event['end']}) [ID: {event_id}]")
         else:
-            print("No events found in the next week")
+            print("No events found in the date range")
             
     except Exception as e:
         print(f"❌ Error: {e}")
@@ -65,32 +53,16 @@ def test_book_event():
     
     print("=== Test 2: Booking New Event ===\n")
     
-    # Get OAuth token
-    oauth_token = get_google_oauth_token(user_id)
-    if not oauth_token:
-        print("❌ Failed to get OAuth token")
-        return
-    
-    # Get user's timezone first
-    timezone_id = get_calendar_timezone(user_id, oauth_token)
-    print(f"User timezone: {timezone_id}")
-    
-    # Book event for tomorrow at 8 PM in user's timezone
-    user_tz = pytz.timezone(timezone_id)
-    tomorrow = datetime.now(user_tz) + timedelta(days=1)
-    start_time = tomorrow.replace(hour=20, minute=0, second=0, microsecond=0)
-    end_time = start_time + timedelta(hours=1)
-    
-    # Format in user's timezone
-    start_iso = start_time.isoformat()
-    end_iso = end_time.isoformat()
+    # Book event for tomorrow at 8 PM
+    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
     
     try:
         booked_event = book_event(
             user_id=user_id,
-            oauth_token=oauth_token,
-            start_timestamp=start_iso,
-            end_timestamp=end_iso,
+            start_date=tomorrow,
+            start_time="20:00",
+            end_date=tomorrow,
+            end_time="21:00",
             title="Test Event - Automated Booking",
             description="This event was created by the test script",
             attendees=["test@example.com"],
@@ -101,6 +73,7 @@ def test_book_event():
         print(f"Event ID: {booked_event['event_id']}")
         print(f"Title: {booked_event['title']}")
         print(f"Time: {booked_event['start']} to {booked_event['end']}")
+        print(f"Timezone: {booked_event['timezone']}")
         print(f"Link: {booked_event['html_link']}")
         
         # Save event ID for cancellation test
@@ -117,14 +90,14 @@ def test_cancel_event():
     
     print("=== Test 3: Canceling Event ===\n")
     
-    # Get OAuth token
-    oauth_token = get_google_oauth_token(user_id)
-    if not oauth_token:
-        print("❌ Failed to get OAuth token")
-        return
+    # Try to read event ID from file, or use a default
+    event_id = "2c187f2272pjvd9hvvi8d38jog"
     
-    event_id = "h7oh8i63ov91vqdg5fev34703g"
-
+    try:
+        with open('/tmp/test_event_id.txt', 'r') as f:
+            event_id = f.read().strip()
+    except FileNotFoundError:
+        print("No saved event ID found, using default")
     
     if event_id == "REPLACE_WITH_ACTUAL_EVENT_ID":
         print("❌ Please run test_book_event first or manually set event_id")
@@ -133,7 +106,6 @@ def test_cancel_event():
     try:
         cancel_result = cancel_event(
             user_id=user_id,
-            oauth_token=oauth_token,
             event_id=event_id,
             notify_attendees=True
         )
@@ -145,7 +117,6 @@ def test_cancel_event():
         print(f"❌ Error: {e}")
 
 
-# Keep the original functions for reference
 def test_calendar_tools():
     """Example usage of the calendar tools"""
     
@@ -154,29 +125,13 @@ def test_calendar_tools():
     
     print("=== Google Calendar Tools Demo ===\n")
     
-    # 1. Get OAuth token
-    print("1. Getting OAuth token...")
-    oauth_token = get_google_oauth_token(user_id)
-    if not oauth_token:
-        print("❌ Failed to get OAuth token")
-        return
-    print("✅ OAuth token retrieved successfully\n")
-    
-    # 2. Get calendar timezone
-    print("2. Getting calendar timezone...")
-    timezone_id = get_calendar_timezone(user_id, oauth_token)
-    print(f"✅ Calendar timezone: {timezone_id}\n")
-    
-    # 3. Fetch availability for next week
-    print("3. Fetching availability for next week...")
-    start_time = datetime.now() + timedelta(days=1)
-    end_time = start_time + timedelta(days=7)
-    
-    start_iso = start_time.isoformat() + 'Z'
-    end_iso = end_time.isoformat() + 'Z'
+    # 1. Fetch availability for next week
+    print("1. Fetching availability for next week...")
+    start_date = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+    end_date = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d")
     
     try:
-        availability = fetch_availability(user_id, oauth_token, start_iso, end_iso)
+        availability = fetch_availability(user_id, start_date, end_date)
         print(f"✅ Found {availability['total_events']} events in the time range")
         print(f"   Timezone: {availability['timezone']}")
         
@@ -191,17 +146,17 @@ def test_calendar_tools():
     except Exception as e:
         print(f"❌ Error fetching availability: {e}\n")
     
-    # 4. Book a test event
-    print("4. Booking a test event...")
-    test_start = (datetime.now() + timedelta(days=2, hours=10)).isoformat() + 'Z'
-    test_end = (datetime.now() + timedelta(days=2, hours=11)).isoformat() + 'Z'
+    # 2. Book a test event
+    print("2. Booking a test event...")
+    test_date = (datetime.now() + timedelta(days=2)).strftime("%Y-%m-%d")
     
     try:
         booked_event = book_event(
             user_id=user_id,
-            oauth_token=oauth_token,
-            start_timestamp=test_start,
-            end_timestamp=test_end,
+            start_date=test_date,
+            start_time="10:00",
+            end_date=test_date,
+            end_time="11:00",
             title="Test Meeting - Scheduling Agent",
             description="This is a test event created by the scheduling agent",
             attendees=["test@example.com"],
@@ -212,14 +167,14 @@ def test_calendar_tools():
         print(f"   Event ID: {booked_event['event_id']}")
         print(f"   Title: {booked_event['title']}")
         print(f"   Time: {booked_event['start']} to {booked_event['end']}")
+        print(f"   Timezone: {booked_event['timezone']}")
         print(f"   Link: {booked_event['html_link']}")
         print()
         
-        # 5. Cancel the test event
-        print("5. Cancelling the test event...")
+        # 3. Cancel the test event
+        print("3. Cancelling the test event...")
         cancel_result = cancel_event(
             user_id=user_id,
-            oauth_token=oauth_token,
             event_id=booked_event['event_id'],
             notify_attendees=True
         )
@@ -239,35 +194,35 @@ def agent_usage_example():
     # Simulate agent workflow
     user_id = "user_2abc123def456"
     
-    # Agent gets OAuth token
-    oauth_token = get_google_oauth_token(user_id)
-    if not oauth_token:
-        print("Agent cannot proceed without OAuth token")
-        return
+    # Agent checks availability for tomorrow
+    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
     
-    # Agent checks user's timezone
-    timezone = get_calendar_timezone(user_id, oauth_token)
-    print(f"Agent detected user timezone: {timezone}")
-    
-    # Agent checks availability for tomorrow (9 AM to 5 PM in user's timezone)
-    tomorrow = datetime.now() + timedelta(days=1)
-    start_time = tomorrow.replace(hour=9, minute=0, second=0, microsecond=0)
-    end_time = tomorrow.replace(hour=17, minute=0, second=0, microsecond=0)
-    
-    availability = fetch_availability(
-        user_id, 
-        oauth_token, 
-        start_time.isoformat() + 'Z',
-        end_time.isoformat() + 'Z'
-    )
-    
-    print(f"Agent found {availability['total_events']} events tomorrow")
-    
-    # Agent can now make intelligent scheduling decisions
-    if availability['total_events'] < 3:
-        print("Agent: User has availability tomorrow, can schedule meetings")
-    else:
-        print("Agent: User is busy tomorrow, should look for other days")
+    try:
+        availability = fetch_availability(user_id, tomorrow, tomorrow)
+        
+        print(f"Agent detected user timezone: {availability['timezone']}")
+        print(f"Agent found {availability['total_events']} events tomorrow")
+        
+        # Agent can now make intelligent scheduling decisions
+        if availability['total_events'] < 3:
+            print("Agent: User has availability tomorrow, can schedule meetings")
+            
+            # Agent books a meeting
+            booked_event = book_event(
+                user_id=user_id,
+                start_date=tomorrow,
+                start_time="14:00",
+                end_date=tomorrow,
+                end_time="15:00",
+                title="AI Scheduled Meeting",
+                description="This meeting was scheduled by the AI agent"
+            )
+            print(f"Agent: Booked meeting at {booked_event['start']}")
+        else:
+            print("Agent: User is busy tomorrow, should look for other days")
+            
+    except Exception as e:
+        print(f"Agent error: {e}")
 
 
 if __name__ == "__main__":
