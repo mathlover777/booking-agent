@@ -6,13 +6,8 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
 from clerk_util import CALENDAR_TOOLS, get_availability, book_event
-from email_util import parse_email_from_s3
-
-class BookingAgentResponse(BaseModel):
-    """Response format for the booking agent"""
-    owner_email: Optional[str] = Field(None, description="Email address of the calendar owner")
-    email_response: str = Field(..., description="Human readable response to send back")
-    email_ids: List[str] = Field(default_factory=list, description="List of email addresses found in the thread (excluding booking email)")
+from email_util import parse_email_from_s3, send_email_via_ses
+import re
 
 def get_booking_agent_system_prompt():
     """
@@ -50,11 +45,17 @@ Your goals:
 
 4. **Final response**:
    - Provide a human-readable email reply that addresses the user's request
-   - **Always address the response to whoever sent the last message in the thread**
+   - **Dynamically determine who to address in the greeting**:
+     * If this is a direct reply to someone asking for availability/booking → address greeting to that person
+     * If this is a group conversation → address greeting to the person who initiated the booking request
+     * If someone is confirming a specific time slot → address greeting to that person
+     * If unclear → address greeting to the sender of the most recent relevant message (not from `{booking_email}`)
+   - **IMPORTANT**: Start your response with "TO: [email_address]" on a separate line to specify who the greeting should address
    - When showing availability, present 5-6 specific 1-hour time slots that are free
    - Make it easy for the user to choose a slot by clearly listing the available times
    - Include all email addresses found in the email thread in the `email_ids` array
    - Exclude `{booking_email}` from the `email_ids` array since you'll be sending from that address
+   - **Always end your response with**: "By VibeCal" as the signature
 
 5. **Email analysis tips**:
    - Use Return-Path as the most reliable sender identifier
@@ -64,6 +65,120 @@ Your goals:
 
 Remember: You're working with already parsed email data, so focus on understanding the content and responding appropriately.
 """
+
+
+def send_ai_response_to_thread(parsed_email: dict, ai_response_content: str) -> dict:
+    """
+    Send the AI response to all participants in the email thread (reply all).
+    
+    Args:
+        parsed_email: Parsed email data from parse_email_from_s3
+        ai_response_content: The AI-generated response content to send
+    
+    Returns:
+        Dict with send result
+    """
+    import re
+    import os
+    
+    booking_email = os.getenv('BOOKING_EMAIL', 'book@bhaang.com')
+    
+    # Parse the "TO:" line from AI response to determine greeting recipient
+    lines = ai_response_content.strip().split('\n')
+    greeting_recipient = None
+    cleaned_response_content = ai_response_content
+    
+    # Look for "TO: [email]" at the beginning of the response
+    if lines and lines[0].strip().upper().startswith('TO:'):
+        to_line = lines[0].strip()
+        email_match = re.search(r'TO:\s*([^\s]+@[^\s]+)', to_line, re.IGNORECASE)
+        if email_match:
+            greeting_recipient = email_match.group(1)
+            # Remove the TO: line from the response content
+            cleaned_response_content = '\n'.join(lines[1:]).strip()
+            print(f"🎯 AI specified greeting recipient: {greeting_recipient}")
+    
+    # Get all participants from the email thread
+    all_participants = []
+    
+    # Add sender (from field)
+    from_addresses = parsed_email.get('from', [])
+    for email_addr in from_addresses:
+        clean_email = _extract_clean_email(email_addr)
+        if clean_email and clean_email.lower() != booking_email.lower():
+            all_participants.append(clean_email)
+    
+    # Add all recipients (to + cc) except booking email
+    to_addresses = parsed_email.get('to', [])
+    cc_addresses = parsed_email.get('cc', [])
+    
+    for email_addr in to_addresses + cc_addresses:
+        clean_email = _extract_clean_email(email_addr)
+        if (clean_email and 
+            clean_email.lower() != booking_email.lower() and 
+            clean_email not in all_participants):
+            all_participants.append(clean_email)
+    
+    if not all_participants:
+        return {
+            'success': False,
+            'error': 'No valid recipients found (all participants are booking email)'
+        }
+    
+    # Get threading information
+    message_id = parsed_email.get('message_id', '')
+    references = parsed_email.get('references', '')
+    
+    # If this is a reply, add the current message ID to references
+    if message_id and references:
+        references = f"{references} {message_id}"
+    elif message_id:
+        references = message_id
+    
+    # Determine subject (add Re: if not already present)
+    subject = parsed_email.get('subject', '')
+    if not subject.lower().startswith('re:'):
+        subject = f"Re: {subject}"
+    
+    print(f"📧 Sending AI response to {len(all_participants)} participants:")
+    for participant in all_participants:
+        print(f"  → {participant}")
+    
+    # Send the AI response to all participants
+    return send_email_via_ses(
+        to_addresses=all_participants,
+        subject=subject,
+        body=cleaned_response_content,
+        reply_to_message_id=message_id,
+        reply_to_references=references
+    )
+
+
+def _extract_clean_email(email_addr: str) -> str:
+    """
+    Extract clean email address from various formats.
+    
+    Args:
+        email_addr: Email address in various formats (e.g., "Name <email@domain.com>", "email@domain.com")
+    
+    Returns:
+        Clean email address
+    """
+    if not email_addr:
+        return ""
+    
+    # Extract email from "Name <email@domain.com>" format
+    if '<' in email_addr and '>' in email_addr:
+        match = re.search(r'<([^>]+)>', email_addr)
+        if match:
+            return match.group(1)
+    
+    # Extract email from "email@domain.com" format (handle spaces)
+    match = re.search(r'([^\s]+@[^\s]+)', email_addr)
+    if match:
+        return match.group(1)
+    
+    return email_addr
 
 
 def process_email_with_ai(s3_bucket: str, s3_key: str) -> dict:
@@ -197,45 +312,26 @@ def process_email_with_ai(s3_bucket: str, s3_key: str) -> dict:
 
         print(f"Final response: {final_response}")
         
-        # Parse the response to extract structured data
-        # For now, we'll extract email addresses and owner email from the response
-        # In a more sophisticated implementation, you might want to use a structured output format
+        # Send the AI response to all participants in the thread
+        send_result = send_ai_response_to_thread(parsed_email, final_response)
         
-        # Extract email addresses from the email data
-        # email_ids = []
-        # for field in ['from', 'to', 'cc']:
-        #     for email_entry in email_data_for_ai.get(field, []):
-        #         # Extract email from "Name <email@domain.com>" format
-        #         if '<' in email_entry and '>' in email_entry:
-        #             email = email_entry.split('<')[1].split('>')[0]
-        #         else:
-        #             email = email_entry
-                
-        #         # Exclude the booking email
-        #         booking_email = os.getenv('BOOKING_EMAIL', 'book@bhaang.com')
-        #         if email != booking_email:
-        #             email_ids.append(email)
-        
-        # # Remove duplicates while preserving order
-        # email_ids = list(dict.fromkeys(email_ids))
-        
-        # # Try to extract owner email from the response or use a fallback
-        # owner_email = None
-        # # Look for the first email in 'from' field as a fallback
-        # if email_data_for_ai.get('from'):
-        #     from_entry = email_data_for_ai['from'][0]
-        #     if '<' in from_entry and '>' in from_entry:
-        #         owner_email = from_entry.split('<')[1].split('>')[0]
-        #     else:
-        #         owner_email = from_entry
-        
-        # return {
-        #     'action': 'processed',
-        #     'owner_email': owner_email,
-        #     'email_response': final_response,
-        #     'email_ids': email_ids,
-        #     'parsed_email_data': email_data_for_ai
-        # }
+        if send_result['success']:
+            print(f"✅ AI response sent successfully! Message ID: {send_result['message_id']}")
+            return {
+                'action': 'processed',
+                'email_response': final_response,
+                'send_result': send_result,
+                'parsed_email_data': email_data_for_ai
+            }
+        else:
+            print(f"❌ Failed to send AI response: {send_result['error']}")
+            return {
+                'action': 'error',
+                'error': send_result['error'],
+                'email_response': final_response,
+                'send_result': send_result,
+                'parsed_email_data': email_data_for_ai
+            }
         
     except Exception as e:
         print(f"❌ Error processing email with AI: {e}")
