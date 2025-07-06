@@ -1,18 +1,23 @@
 #!/usr/bin/env python3
 """
 Script to create SES domain verification and DKIM records after CDK deployment.
-This script should be run after the CDK stack is deployed.
+This script should be run after the InfrastructureStack is deployed.
 
 The script handles:
-- Domain verification TXT record (_amazonses.bhaang.com)
+- Domain verification TXT record (_amazonses.{DOMAIN})
 - DKIM CNAME records for email authentication
 """
 
 import boto3
 import time
 import sys
+import os
+from dotenv import load_dotenv
 
-DOMAIN = "bhaang.com"
+# Load environment variables
+load_dotenv('.env.base')
+
+DOMAIN = os.getenv('DOMAIN_NAME')
 
 route53 = boto3.client("route53")
 ses = boto3.client("ses")
@@ -91,6 +96,29 @@ def apply_route53_changes(hosted_zone_id: str, changes: list[dict]):
     print("Change status:", resp["ChangeInfo"]["Status"])
 
 
+def set_active_receipt_rule_set():
+    """Set the receipt rule set as active."""
+    try:
+        # Get the rule set name from CDK output or environment variable
+        rule_set_name = os.getenv('RECEIPT_RULE_SET_NAME')
+        if not rule_set_name:
+            print("Warning: RECEIPT_RULE_SET_NAME not found in environment. Skipping rule set activation.")
+            return
+        
+        print(f"Setting receipt rule set '{rule_set_name}' as active...")
+        
+        # Set the rule set as active
+        ses.set_active_receipt_rule_set(
+            RuleSetName=rule_set_name
+        )
+        
+        print(f"Successfully set '{rule_set_name}' as the active receipt rule set!")
+        
+    except Exception as e:
+        print(f"Error setting active receipt rule set: {e}")
+        # Don't exit with error as this is not critical for the main functionality
+
+
 def main():
     """Main function to set up DKIM and verification records."""
     print(f"Setting up SES domain records for {DOMAIN}")
@@ -124,6 +152,9 @@ def main():
         
         # Apply all changes
         apply_route53_changes(zone_id, all_changes)
+        
+        # Set the receipt rule set as active
+        set_active_receipt_rule_set()
         
         print("SES domain setup completed successfully!")
         
