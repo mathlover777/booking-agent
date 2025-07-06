@@ -129,3 +129,12 @@ test-high-level-book: ## Test high-level book_event function
 test-high-level-cancel: ## Test high-level cancel_event function
 	@echo "Testing high-level cancel_event function..."
 	cd src && python -c "from test_calendar_tools import test_high_level_cancel_event; test_high_level_cancel_event()"
+
+# Booking agent AI tests
+test-booking-agent: ## Test booking agent AI integration
+	@echo "Testing booking agent AI integration..."
+	cd src && python test_booking_agent.py
+
+test-real-email: ## Test booking agent with real S3 email
+	@echo "Testing booking agent with real S3 email..."
+	cd src && python -c "from test_booking_agent import test_real_s3_email; test_real_s3_email()"
