@@ -9,6 +9,7 @@ from aws_cdk import (
     aws_route53 as route53,
     CfnOutput,
     aws_iam as iam,
+    aws_lambda as lambda_,
 )
 from constructs import Construct
 
@@ -23,6 +24,7 @@ class CommonStack(Stack):
     - ReceiptRuleSet
     - S3 Bucket
     - Route53 records
+    - Lambda Layer (shared dependencies)
     """
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
@@ -51,6 +53,16 @@ class CommonStack(Stack):
                     }
                 }
             )
+        )
+
+        # Create Lambda Layer with shared dependencies
+        self.lambda_layer = lambda_.LayerVersion(
+            self, "VibesDependenciesLayer",
+            layer_version_name="vibes-dependencies",
+            description="Shared dependencies for Vibes Lambda functions",
+            code=lambda_.Code.from_asset("lambda-layer"),
+            compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
+            removal_policy=RemovalPolicy.RETAIN,
         )
 
         # Import existing hosted zone for bhaang.com
@@ -96,4 +108,5 @@ class CommonStack(Stack):
         CfnOutput(self, "EmailBucketName", value=self.email_bucket.bucket_name)
         CfnOutput(self, "SESDomainName", value=os.getenv('DOMAIN_NAME'))
         CfnOutput(self, "ReceiptRuleSetName", value=self.ses_receipt_rule_set.receipt_rule_set_name)
-        CfnOutput(self, "HostedZoneId", value=hosted_zone.hosted_zone_id) 
+        CfnOutput(self, "HostedZoneId", value=hosted_zone.hosted_zone_id)
+        CfnOutput(self, "LambdaLayerArn", value=self.lambda_layer.layer_version_arn, export_name="VibesCommonStackLambdaLayerArn") 

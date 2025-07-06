@@ -10,6 +10,7 @@ from aws_cdk import (
     aws_s3_notifications as s3n,
     aws_ses_actions as ses_actions,
     CfnOutput,
+    Fn,
 )
 from constructs import Construct
 
@@ -45,6 +46,14 @@ class EmailProcessorStack(Stack):
         ses_receipt_rule_set = ses.ReceiptRuleSet.from_receipt_rule_set_name(
             self, "ImportedReceiptRuleSet",
             receipt_rule_set_name=os.getenv('RECEIPT_RULE_SET_NAME')  # Use environment variable
+        )
+
+        # Import the shared Lambda Layer from common stack using cross-stack reference
+        # Get the layer ARN from the common stack's output
+        lambda_layer_arn = Fn.import_value("VibesCommonStackLambdaLayerArn")
+        lambda_layer = lambda_.LayerVersion.from_layer_version_arn(
+            self, "ImportedLambdaLayer",
+            layer_version_arn=lambda_layer_arn
         )
 
         # Central IAM role for all lambdas in this stage
@@ -96,6 +105,7 @@ class EmailProcessorStack(Stack):
             role=lambda_role,
             timeout=Duration.seconds(30),
             memory_size=256,
+            layers=[lambda_layer],
             environment={
                 "LOG_LEVEL": "INFO",
                 "STAGE": stage,
@@ -140,4 +150,6 @@ class EmailProcessorStack(Stack):
         CfnOutput(self, f"StageEmailAddress{stage.title()}", 
                  value=recipient_email)
         CfnOutput(self, f"StageS3Prefix{stage.title()}", 
-                 value=f"{stage}/emails/") 
+                 value=f"{stage}/emails/")
+        CfnOutput(self, f"LambdaLayerArn{stage.title()}", 
+                 value=lambda_layer.layer_version_arn) 

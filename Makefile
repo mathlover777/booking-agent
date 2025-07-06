@@ -39,7 +39,14 @@ help: ## Show this help message
 bootstrap: ## Bootstrap CDK in the current account/region
 	$(CDK_BOOTSTRAP) --profile $(AWS_PROFILE)
 
-deploy-common: ## Deploy common stack (shared across stages)
+clean-layer: ## Remove all files from lambda-layer/python
+	rm -rf lambda-layer/python/*
+
+install-layer-deps: ## Install Python dependencies for Lambda layer (Linux compatible)
+	@echo "Installing Lambda layer dependencies..."
+	pip3 install --platform manylinux2014_x86_64 --implementation cp --python-version 3.12 --only-binary=:all: --upgrade -r requirements.txt -t lambda-layer/python/
+
+deploy-common: clean-layer install-layer-deps ## Deploy common stack (shared across stages)
 	@echo "Deploying common stack..."
 	$(CDK_DEPLOY) $(COMMON_STACK) --profile $(AWS_PROFILE) --require-approval never
 

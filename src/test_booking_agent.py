@@ -19,9 +19,10 @@ def test_real_s3_email():
     
     # Get bucket name from env
     bucket_name = os.getenv('EMAIL_BUCKET_NAME', 'vibes-email-bucket-dev')
-    # s3_key = "dev/emails/8m5bkklpcn2v8b98gj81633qgdhcj64ucqh3c201"
-    s3_key = "dev/emails/u3oas0q0uphp43s1g6hrgb38ogiotnvblhbc5v01"
-    
+    # s3_key = "dev/emails/8m5bkklpcn2v8b98gj81633qgdhcj64ucqh3c201" # asking for slot
+    # s3_key = "dev/emails/u3oas0q0uphp43s1g6hrgb38ogiotnvblhbc5v01" # asking a different slot
+    # s3_key = "dev/emails/vk3qkk2782k8ke9jk2meh4fhvcdb3o9solpufm81" # booking request
+    s3_key = "dev/emails/kanu0259g8sqd4eoupt7rkf4rct93g8mesuqj5o1" # cancel request
     print(f"Testing with bucket: {bucket_name}")
     print(f"Testing with key: {s3_key}")
     print()

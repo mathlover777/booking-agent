@@ -1,6 +1,6 @@
 import json
 import boto3
-from email_util import parse_email_from_s3, extract_conversation_context, should_reply_to_email, reply_to_email_thread
+from booking_agent import process_email_with_ai
 
 
 def lambda_handler(event, context):
@@ -16,45 +16,31 @@ def lambda_handler(event, context):
     
     print(f"Processing email from S3: {s3_bucket}/{s3_key}")
     
-    # Get the email content from S3
-    s3_client = boto3.client('s3')
-    response = s3_client.get_object(Bucket=s3_bucket, Key=s3_key)
-    email_content = response['Body'].read().decode('utf-8')
+    # Process email with AI booking agent
+    result = process_email_with_ai(s3_bucket, s3_key)
     
-    # Parse the email
-    email_data = parse_email_from_s3(email_content)
-    
-    # Extract conversation context for AI processing
-    conversation_context = extract_conversation_context(email_data)
-    
-    # Print the conversation context as JSON for easy reading in CloudWatch
     print("=" * 80)
-    print("CONVERSATION CONTEXT FOR AI:")
+    print("AI PROCESSING RESULT:")
     print("=" * 80)
-    print(json.dumps(conversation_context, ensure_ascii=False))
+    print(json.dumps(result, indent=2, ensure_ascii=False))
     print("=" * 80)
     
-    # Auto-reply logic
-    print("=" * 80)
-    print("AUTO-REPLY CHECK:")
-    print("=" * 80)
-    
-    if should_reply_to_email(email_data):
-        print("✅ Email should be replied to. Sending auto-reply...")
-        reply_result = reply_to_email_thread(email_data)
-        
-        if reply_result['success']:
-            print(f"✅ Auto-reply sent successfully! Message ID: {reply_result['message_id']}")
-        else:
-            print(f"❌ Failed to send auto-reply: {reply_result['error']}")
+    if result['action'] == 'processed':
+        return {
+            'statusCode': 200,
+            'body': json.dumps({
+                'message': 'Email processed successfully by AI agent',
+                'action': result['action'],
+                'email_response': result['email_response'],
+                'send_result': result['send_result']
+            })
+        }
     else:
-        print("❌ Email does not meet reply criteria. No reply sent.")
-    
-    return {
-        'statusCode': 200,
-        'body': json.dumps({
-            'message': 'Email processed successfully',
-            'conversation_context': conversation_context,
-            'auto_reply_sent': should_reply_to_email(email_data)
-        })
-    } 
+        return {
+            'statusCode': 500,
+            'body': json.dumps({
+                'message': 'Error processing email with AI agent',
+                'action': result['action'],
+                'error': result.get('error', 'Unknown error')
+            })
+        } 
