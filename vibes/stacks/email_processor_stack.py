@@ -59,6 +59,7 @@ class EmailProcessorStack(Stack):
         # Lambda function for email processing
         email_processor = lambda_.Function(
             self, f"EmailProcessor{stage.title()}",
+            function_name=f"EmailProcessor-{stage}",
             runtime=lambda_.Runtime.PYTHON_3_12,
             handler="email_processor.lambda_handler",
             code=lambda_.Code.from_asset("src"),
