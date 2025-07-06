@@ -13,7 +13,7 @@ from aws_cdk import (
 )
 from constructs import Construct
 
-# Load environment variables
+# Load base environment variables
 load_dotenv('.env.base')
 
 
@@ -30,6 +30,9 @@ class EmailProcessorStack(Stack):
         super().__init__(scope, construct_id, **kwargs)
         
         self.stage = stage
+        
+        # Load stage-specific environment variables
+        load_dotenv(f'.env.{stage}')
 
         # Import the shared S3 bucket from infrastructure stack
         # Note: This requires the infrastructure stack to be deployed first
@@ -69,6 +72,20 @@ class EmailProcessorStack(Stack):
             )
         )
 
+        # Add SES permissions for sending emails
+        lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "ses:SendRawEmail",
+                    "ses:SendEmail"
+                ],
+                resources=[
+                    f"arn:aws:ses:{self.region}:{self.account}:identity/*"
+                ]
+            )
+        )
+
         # Lambda function for email processing
         email_processor = lambda_.Function(
             self, f"EmailProcessor{stage.title()}",
@@ -81,7 +98,8 @@ class EmailProcessorStack(Stack):
             memory_size=256,
             environment={
                 "LOG_LEVEL": "INFO",
-                "STAGE": stage
+                "STAGE": stage,
+                "BOOKING_EMAIL": os.getenv('BOOKING_EMAIL')
             }
         )
 
@@ -93,8 +111,8 @@ class EmailProcessorStack(Stack):
         )
 
         # SES ReceiptRule with stage-specific email address
-        booking_prefix = os.getenv('BOOKING_EMAIL_PREFIX')
-        recipient_email = f"{booking_prefix}{stage}@{os.getenv('DOMAIN_NAME')}" if stage != "prod" else f"{booking_prefix}@{os.getenv('DOMAIN_NAME')}"
+        # Use BOOKING_EMAIL directly from environment variable
+        recipient_email = os.getenv('BOOKING_EMAIL')
         
         ses.ReceiptRule(
             self, f"EmailReceiptRule{stage.title()}",

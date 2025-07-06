@@ -12,7 +12,7 @@ from aws_cdk import (
 )
 from constructs import Construct
 
-# Load environment variables
+# Load environment variables - only .env.base for common resources
 load_dotenv('.env.base')
 
 
