@@ -1,6 +1,6 @@
 import json
 import boto3
-from utils import parse_email_from_s3, format_email_summary
+from utils import parse_email_from_s3, extract_conversation_context
 
 
 def lambda_handler(event, context):
@@ -23,15 +23,20 @@ def lambda_handler(event, context):
     # Parse the email
     email_data = parse_email_from_s3(email_content)
     
-    # Format and print the email summary
-    summary = format_email_summary(email_data)
-    print(summary)
+    # Extract conversation context for AI processing
+    conversation_context = extract_conversation_context(email_data)
+    
+    # Print the conversation context as JSON for easy reading in CloudWatch
+    print("=" * 80)
+    print("CONVERSATION CONTEXT FOR AI:")
+    print("=" * 80)
+    print(json.dumps(conversation_context, indent=2, ensure_ascii=False))
+    print("=" * 80)
     
     return {
         'statusCode': 200,
         'body': json.dumps({
             'message': 'Email processed successfully',
-            'subject': email_data['subject'],
-            'from': email_data['from']
+            'conversation_context': conversation_context
         })
     } 
