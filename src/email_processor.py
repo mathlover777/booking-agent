@@ -1,6 +1,6 @@
 import json
 import boto3
-from utils import parse_email_from_s3, extract_conversation_context
+from email_util import parse_email_from_s3, extract_conversation_context, should_reply_to_email, reply_to_email_thread
 
 
 def lambda_handler(event, context):
@@ -34,10 +34,27 @@ def lambda_handler(event, context):
     print(json.dumps(conversation_context, ensure_ascii=False))
     print("=" * 80)
     
+    # Auto-reply logic
+    print("=" * 80)
+    print("AUTO-REPLY CHECK:")
+    print("=" * 80)
+    
+    if should_reply_to_email(email_data):
+        print("✅ Email should be replied to. Sending auto-reply...")
+        reply_result = reply_to_email_thread(email_data)
+        
+        if reply_result['success']:
+            print(f"✅ Auto-reply sent successfully! Message ID: {reply_result['message_id']}")
+        else:
+            print(f"❌ Failed to send auto-reply: {reply_result['error']}")
+    else:
+        print("❌ Email does not meet reply criteria. No reply sent.")
+    
     return {
         'statusCode': 200,
         'body': json.dumps({
             'message': 'Email processed successfully',
-            'conversation_context': conversation_context
+            'conversation_context': conversation_context,
+            'auto_reply_sent': should_reply_to_email(email_data)
         })
     } 

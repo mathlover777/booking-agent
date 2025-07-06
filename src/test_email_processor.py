@@ -12,6 +12,7 @@ import os
 
 from email_processor import lambda_handler
 
+
 # Load environment variables from .env.base (relative to project root)
 
 

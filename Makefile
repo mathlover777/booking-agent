@@ -95,8 +95,8 @@ test-staging: STAGE=staging ## Quick staging deployment
 test-staging: deploy-stage
 
 # Email processing test
-test-email: ## Test email processing with default S3 key
-	@echo "Testing email processing..."
+test-email: ## Test email processing and auto-reply with default S3 key
+	@echo "Testing email processing and auto-reply..."
 	cd src && python test_email_processor.py
 
 # Clerk utility test
