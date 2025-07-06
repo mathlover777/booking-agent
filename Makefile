@@ -116,3 +116,16 @@ test-calendar-book: ## Test calendar event booking
 test-calendar-cancel: ## Test calendar event cancellation
 	@echo "Testing calendar event cancellation..."
 	cd src && python -c "from test_calendar_tools import test_cancel_event; test_cancel_event()"
+
+# High-level calendar function tests
+test-high-level-availability: ## Test high-level get_availability function
+	@echo "Testing high-level get_availability function..."
+	cd src && python -c "from test_calendar_tools import test_high_level_get_availability; test_high_level_get_availability()"
+
+test-high-level-book: ## Test high-level book_event function
+	@echo "Testing high-level book_event function..."
+	cd src && python -c "from test_calendar_tools import test_high_level_book_event; test_high_level_book_event()"
+
+test-high-level-cancel: ## Test high-level cancel_event function
+	@echo "Testing high-level cancel_event function..."
+	cd src && python -c "from test_calendar_tools import test_high_level_cancel_event; test_high_level_cancel_event()"

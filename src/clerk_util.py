@@ -60,7 +60,7 @@ def get_user_by_email(email: str) -> str:
         raise Exception(f"Failed to fetch user by email: {str(e)}")
 
 
-def get_google_oauth_token(user_id: str) -> Optional[str]:
+def get_google_oauth_token_low_level(user_id: str) -> Optional[str]:
     """Retrieve Google OAuth token for a user from Clerk API"""
     try:
         url = f"https://api.clerk.com/v1/users/{user_id}/oauth_access_tokens/oauth_google"
@@ -77,7 +77,7 @@ def get_google_oauth_token(user_id: str) -> Optional[str]:
         return None
 
 
-def get_user_timezone(user_id: str, oauth_token: str) -> str:
+def get_user_timezone_low_level(user_id: str, oauth_token: str) -> str:
     """
     Get the user's calendar timezone.
     
@@ -103,7 +103,7 @@ def get_user_timezone(user_id: str, oauth_token: str) -> str:
         return 'UTC'  # Fallback to UTC
 
 
-def fetch_availability(user_id: str, start_date: str, end_date: str) -> Dict[str, Any]:
+def get_availability_low_level(user_id: str, start_date: str, end_date: str) -> Dict[str, Any]:
     """
     Fetch user's calendar availability for a given date range.
     
@@ -120,12 +120,12 @@ def fetch_availability(user_id: str, start_date: str, end_date: str) -> Dict[str
     """
     try:
         # Get OAuth token internally
-        oauth_token = get_google_oauth_token(user_id)
+        oauth_token = get_google_oauth_token_low_level(user_id)
         if not oauth_token:
             raise Exception("Could not retrieve Google OAuth token for user")
         
         # Get user's timezone
-        user_timezone = get_user_timezone(user_id, oauth_token)
+        user_timezone = get_user_timezone_low_level(user_id, oauth_token)
         
         # Convert dates to timestamps in user's timezone
         # Start of day in user's timezone
@@ -190,7 +190,7 @@ def fetch_availability(user_id: str, start_date: str, end_date: str) -> Dict[str
         raise Exception(f"Failed to fetch calendar availability: {str(e)}")
 
 
-def book_event(
+def book_event_low_level(
     user_id: str, 
     start_date: str,
     start_time: str,
@@ -222,12 +222,12 @@ def book_event(
     """
     try:
         # Get OAuth token internally
-        oauth_token = get_google_oauth_token(user_id)
+        oauth_token = get_google_oauth_token_low_level(user_id)
         if not oauth_token:
             raise Exception("Could not retrieve Google OAuth token for user")
         
         # Get user's timezone
-        user_timezone = get_user_timezone(user_id, oauth_token)
+        user_timezone = get_user_timezone_low_level(user_id, oauth_token)
         
         # Convert date and time to datetime in user's timezone
         start_datetime_str = f"{start_date}T{start_time}:00"
@@ -320,7 +320,7 @@ def book_event(
         raise Exception(f"Failed to book event: {str(e)}")
 
 
-def cancel_event(user_id: str, event_id: str, notify_attendees: bool = True) -> Dict[str, Any]:
+def cancel_event_low_level(user_id: str, event_id: str, notify_attendees: bool = True) -> Dict[str, Any]:
     """
     Cancel/delete an event from the user's Google Calendar.
     
@@ -334,7 +334,7 @@ def cancel_event(user_id: str, event_id: str, notify_attendees: bool = True) -> 
     """
     try:
         # Get OAuth token internally
-        oauth_token = get_google_oauth_token(user_id)
+        oauth_token = get_google_oauth_token_low_level(user_id)
         if not oauth_token:
             raise Exception("Could not retrieve Google OAuth token for user")
         
@@ -363,28 +363,89 @@ def cancel_event(user_id: str, event_id: str, notify_attendees: bool = True) -> 
         raise Exception(f"Failed to cancel event: {str(e)}")
 
 
-# Keep the old function for backward compatibility
-def get_calendar_timezone(user_id: str, oauth_token: str) -> str:
+# High-level wrapper functions that take email addresses
+def get_availability(owner_email: str, start_date: str, end_date: str) -> Dict[str, Any]:
     """
-    Get the user's calendar timezone.
+    Fetch calendar availability for a given date range using email address.
     
     Args:
-        user_id: User identifier
-        oauth_token: Google OAuth access token
+        owner_email: Email address of the calendar owner
+        start_date: Start date in YYYY-MM-DD format (e.g., "2024-01-01")
+        end_date: End date in YYYY-MM-DD format (e.g., "2024-01-31")
     
     Returns:
-        Timezone identifier (e.g., "America/New_York")
+        Dict containing calendar availability information
     """
     try:
-        calendar_url = f"{GOOGLE_CALENDAR_API_BASE}/calendars/primary"
-        headers = {'Authorization': f'Bearer {oauth_token}'}
-        
-        response = requests.get(calendar_url, headers=headers, timeout=30)
-        response.raise_for_status()
-        
-        calendar_data = response.json()
-        return calendar_data.get('timeZone', 'UTC')
-        
+        user_id = get_user_by_email(owner_email)
+        return get_availability_low_level(user_id, start_date, end_date)
     except Exception as e:
-        logger.error(f"Error getting timezone for user {user_id}: {e}")
-        return 'UTC'  # Fallback to UTC 
+        logger.error(f"Error in get_availability for {owner_email}: {e}")
+        raise Exception(f"Failed to get availability for {owner_email}: {str(e)}")
+
+
+def book_event(
+    owner_email: str,
+    date: str,
+    start_time: str,
+    end_time: str,
+    title: str,
+    description: str = "",
+    attendees: List[str] = None,
+    location: str = "",
+    reminders: Dict[str, Any] = None
+) -> Dict[str, Any]:
+    """
+    Book an event in the calendar using email address.
+    
+    Args:
+        owner_email: Email address of the calendar owner
+        date: Date in YYYY-MM-DD format (e.g., "2024-01-01")
+        start_time: Start time in military format (e.g., "14:30" for 2:30 PM)
+        end_time: End time in military format (e.g., "15:30" for 3:30 PM)
+        title: Event title
+        description: Event description
+        attendees: List of attendee email addresses
+        location: Event location
+        reminders: Reminder settings (optional)
+    
+    Returns:
+        Dict containing the created event details
+    """
+    try:
+        user_id = get_user_by_email(owner_email)
+        return book_event_low_level(
+            user_id=user_id,
+            start_date=date,
+            start_time=start_time,
+            end_date=date,
+            end_time=end_time,
+            title=title,
+            description=description,
+            attendees=attendees,
+            location=location,
+            reminders=reminders
+        )
+    except Exception as e:
+        logger.error(f"Error in book_event for {owner_email}: {e}")
+        raise Exception(f"Failed to book event for {owner_email}: {str(e)}")
+
+
+def cancel_event(owner_email: str, event_id: str, notify_attendees: bool = True) -> Dict[str, Any]:
+    """
+    Cancel/delete an event from the calendar using email address.
+    
+    Args:
+        owner_email: Email address of the calendar owner
+        event_id: Google Calendar event ID
+        notify_attendees: Whether to notify attendees about the cancellation
+    
+    Returns:
+        Dict containing cancellation status
+    """
+    try:
+        user_id = get_user_by_email(owner_email)
+        return cancel_event_low_level(user_id, event_id, notify_attendees)
+    except Exception as e:
+        logger.error(f"Error in cancel_event for {owner_email}: {e}")
+        raise Exception(f"Failed to cancel event for {owner_email}: {str(e)}") 

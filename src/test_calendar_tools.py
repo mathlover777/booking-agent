@@ -12,11 +12,14 @@ import os
 from datetime import datetime, timedelta, timezone
 import pytz
 from clerk_util import (
-    get_google_oauth_token,
-    fetch_availability,
+    get_google_oauth_token_low_level,
+    get_availability_low_level,
+    book_event_low_level,
+    cancel_event_low_level,
+    # High-level functions
+    get_availability,
     book_event,
-    cancel_event,
-    get_calendar_timezone
+    cancel_event
 )
 
 
@@ -31,7 +34,7 @@ def test_get_bookings():
     end_date = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d")
     
     try:
-        availability = fetch_availability(user_id, start_date, end_date)
+        availability = get_availability_low_level(user_id, start_date, end_date)
         print(f"User timezone: {availability['timezone']}")
         print(f"Found {availability['total_events']} events from {start_date} to {end_date}")
         
@@ -57,7 +60,7 @@ def test_book_event():
     tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
     
     try:
-        booked_event = book_event(
+        booked_event = book_event_low_level(
             user_id=user_id,
             start_date=tomorrow,
             start_time="20:00",
@@ -104,7 +107,7 @@ def test_cancel_event():
         return
     
     try:
-        cancel_result = cancel_event(
+        cancel_result = cancel_event_low_level(
             user_id=user_id,
             event_id=event_id,
             notify_attendees=True
@@ -131,7 +134,7 @@ def test_calendar_tools():
     end_date = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d")
     
     try:
-        availability = fetch_availability(user_id, start_date, end_date)
+        availability = get_availability_low_level(user_id, start_date, end_date)
         print(f"✅ Found {availability['total_events']} events in the time range")
         print(f"   Timezone: {availability['timezone']}")
         
@@ -151,7 +154,7 @@ def test_calendar_tools():
     test_date = (datetime.now() + timedelta(days=2)).strftime("%Y-%m-%d")
     
     try:
-        booked_event = book_event(
+        booked_event = book_event_low_level(
             user_id=user_id,
             start_date=test_date,
             start_time="10:00",
@@ -173,7 +176,7 @@ def test_calendar_tools():
         
         # 3. Cancel the test event
         print("3. Cancelling the test event...")
-        cancel_result = cancel_event(
+        cancel_result = cancel_event_low_level(
             user_id=user_id,
             event_id=booked_event['event_id'],
             notify_attendees=True
@@ -198,7 +201,7 @@ def agent_usage_example():
     tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
     
     try:
-        availability = fetch_availability(user_id, tomorrow, tomorrow)
+        availability = get_availability_low_level(user_id, tomorrow, tomorrow)
         
         print(f"Agent detected user timezone: {availability['timezone']}")
         print(f"Agent found {availability['total_events']} events tomorrow")
@@ -208,7 +211,7 @@ def agent_usage_example():
             print("Agent: User has availability tomorrow, can schedule meetings")
             
             # Agent books a meeting
-            booked_event = book_event(
+            booked_event = book_event_low_level(
                 user_id=user_id,
                 start_date=tomorrow,
                 start_time="14:00",
@@ -223,6 +226,155 @@ def agent_usage_example():
             
     except Exception as e:
         print(f"Agent error: {e}")
+
+
+# New tests for high-level functions
+def test_high_level_get_availability():
+    """Test high-level get_availability function with email"""
+    owner_email = "souravsarkar1729@gmail.com"
+    
+    print("=== Test High-Level: Get Availability ===\n")
+    
+    # Calculate date range for next week
+    start_date = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+    end_date = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d")
+    
+    try:
+        availability = get_availability(owner_email, start_date, end_date)
+        print(f"✅ Found {availability['total_events']} events for {owner_email}")
+        print(f"   Timezone: {availability['timezone']}")
+        print(f"   Date range: {start_date} to {end_date}")
+        
+        if availability['events']:
+            print("\n   Events found:")
+            for event in availability['events'][:3]:  # Show first 3 events
+                print(f"   - {event['title']} ({event['start']} to {event['end']})")
+        else:
+            print("   No events found in the date range")
+            
+    except Exception as e:
+        print(f"❌ Error: {e}")
+
+
+def test_high_level_book_event():
+    """Test high-level book_event function with email"""
+    owner_email = "souravsarkar1729@gmail.com"
+    
+    print("=== Test High-Level: Book Event ===\n")
+    
+    # Book event for tomorrow at 3 PM
+    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+    
+    try:
+        booked_event = book_event(
+            owner_email=owner_email,
+            date=tomorrow,
+            start_time="15:00",
+            end_time="16:00",
+            title="High-Level Test Event",
+            description="This event was created using the high-level wrapper function",
+            attendees=["souravmathlover@gmail.com"],
+            location="Virtual Meeting"
+        )
+        
+        print(f"✅ Event booked successfully!")
+        print(f"   Event ID: {booked_event['event_id']}")
+        print(f"   Title: {booked_event['title']}")
+        print(f"   Time: {booked_event['start']} to {booked_event['end']}")
+        print(f"   Timezone: {booked_event['timezone']}")
+        print(f"   Attendees: {booked_event['attendees']}")
+        print(f"   Link: {booked_event['html_link']}")
+        
+        # Save event ID for cancellation test
+        with open('/tmp/high_level_test_event_id.txt', 'w') as f:
+            f.write(booked_event['event_id'])
+            
+    except Exception as e:
+        print(f"❌ Error: {e}")
+
+
+def test_high_level_cancel_event():
+    """Test high-level cancel_event function with email"""
+    owner_email = "souravsarkar1729@gmail.com"
+    
+    print("=== Test High-Level: Cancel Event ===\n")
+    
+    # Try to read event ID from file, or use a default
+    event_id = "test_event_id"
+    
+    try:
+        with open('/tmp/high_level_test_event_id.txt', 'r') as f:
+            event_id = f.read().strip()
+    except FileNotFoundError:
+        print("No saved event ID found, using default")
+    
+    if event_id == "test_event_id":
+        print("❌ Please run test_high_level_book_event first or manually set event_id")
+        return
+    
+    try:
+        cancel_result = cancel_event(
+            owner_email=owner_email,
+            event_id=event_id,
+            notify_attendees=True
+        )
+        
+        print(f"✅ Event cancelled: {cancel_result['message']}")
+        print(f"   Event ID: {cancel_result['event_id']}")
+        print(f"   Notified attendees: {cancel_result['notified_attendees']}")
+        
+    except Exception as e:
+        print(f"❌ Error: {e}")
+
+
+def test_high_level_calendar_tools():
+    """Complete test of high-level calendar tools"""
+    owner_email = "souravsarkar1729@gmail.com"
+    
+    print("=== High-Level Calendar Tools Complete Test ===\n")
+    
+    # 1. Get availability
+    print("1. Getting availability...")
+    start_date = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+    end_date = (datetime.now() + timedelta(days=3)).strftime("%Y-%m-%d")
+    
+    try:
+        availability = get_availability(owner_email, start_date, end_date)
+        print(f"✅ Found {availability['total_events']} events for {owner_email}")
+        print()
+        
+        # 2. Book an event
+        print("2. Booking an event...")
+        test_date = (datetime.now() + timedelta(days=2)).strftime("%Y-%m-%d")
+        
+        booked_event = book_event(
+            owner_email=owner_email,
+            date=test_date,
+            start_time="14:00",
+            end_time="15:00",
+            title="Complete Test Event",
+            description="Testing the complete high-level workflow",
+            attendees=["souravmathlover@gmail.com"],
+            location="Virtual Meeting"
+        )
+        
+        print(f"✅ Event booked: {booked_event['title']}")
+        print(f"   Event ID: {booked_event['event_id']}")
+        print()
+        
+        # 3. Cancel the event
+        print("3. Cancelling the event...")
+        cancel_result = cancel_event(
+            owner_email=owner_email,
+            event_id=booked_event['event_id'],
+            notify_attendees=True
+        )
+        
+        print(f"✅ Event cancelled: {cancel_result['message']}")
+        print()
+        
+    except Exception as e:
+        print(f"❌ Error in complete test: {e}")
 
 
 if __name__ == "__main__":
