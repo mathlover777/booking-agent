@@ -141,4 +141,11 @@ status: ## Show deployment status
 bootstrap: ## Bootstrap CDK environment (run once per AWS account/region)
 	@echo "$(BLUE)Bootstrapping CDK environment...$(NC)"
 	$(CDK) bootstrap
-	@echo "$(GREEN)✓ CDK environment bootstrapped$(NC)" 
+	@echo "$(GREEN)✓ CDK environment bootstrapped$(NC)"
+
+# SES Domain Setup
+setup-ses-domain: ## Set up DKIM and verification records for SES domain (run after deployment)
+	@echo "$(BLUE)Setting up SES domain records for bhaang.com...$(NC)"
+	@echo "$(YELLOW)Note: This should be run after the CDK stack is deployed$(NC)"
+	$(PYTHON) vibes/setup_ses_domain.py
+	@echo "$(GREEN)✓ SES domain records configured$(NC)"

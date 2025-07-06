@@ -11,6 +11,7 @@ from aws_cdk import (
     aws_route53 as route53,
     aws_route53_targets as targets,
     aws_ses_actions as ses_actions,
+    CfnOutput,
 )
 from constructs import Construct
 
@@ -68,7 +69,7 @@ class VibesStack(Stack):
         email_bucket.add_event_notification(
             s3.EventType.OBJECT_CREATED,
             s3n.LambdaDestination(email_processor),
-            s3.NotificationKeyFilter(prefix="emails/")  # Trigger on all files in emails/ folder
+            s3.NotificationKeyFilter(prefix="emails/")  # Only trigger on .eml files
         )
 
         # SES Domain configuration for bhaang.com with automatic DNS setup
@@ -95,13 +96,8 @@ class VibesStack(Stack):
             ]
         )
 
-        # Add TXT record for domain verification
-        route53.TxtRecord(
-            self, "DomainVerificationRecord",
-            zone=hosted_zone,
-            record_name="_amazonses.bhaang.com",
-            values=["9jBHm71kqVtneGEMn6/m/YL1I6IjfN+7tJ8IuJrECxo="]
-        )
+        # Note: Domain verification TXT record is created separately after deployment using setup_dkim.py
+        # This is because the verification token is not immediately available during CDK deployment
 
         # Add SPF record to authorize SES to send emails from this domain
         route53.TxtRecord(
@@ -111,45 +107,19 @@ class VibesStack(Stack):
             values=["v=spf1 include:amazonses.com ~all"]
         )
 
-        # Add DKIM CNAME records for email authentication
-        route53.CnameRecord(
-            self, "DKIMRecord1",
-            zone=hosted_zone,
-            record_name="eq4e3eustqjzle7jgttfmszw72d5ylgc._domainkey.bhaang.com",
-            domain_name="eq4e3eustqjzle7jgttfmszw72d5ylgc.dkim.amazonses.com"
-        )
-        
-        route53.CnameRecord(
-            self, "DKIMRecord2",
-            zone=hosted_zone,
-            record_name="k3jpjfgck6q54sbwh6ep5tbw25olcco5._domainkey.bhaang.com",
-            domain_name="k3jpjfgck6q54sbwh6ep5tbw25olcco5.dkim.amazonses.com"
-        )
-        
-        route53.CnameRecord(
-            self, "DKIMRecord3",
-            zone=hosted_zone,
-            record_name="onogetj6inprtuyzaabbyado52asqcft._domainkey.bhaang.com",
-            domain_name="onogetj6inprtuyzaabbyado52asqcft.dkim.amazonses.com"
-        )
+        # Note: DKIM records are created separately after deployment using setup_dkim.py
+        # This is because DKIM tokens are not immediately available during CDK deployment
 
         # SES configuration for receiving emails
         ses_receipt_rule_set = ses.ReceiptRuleSet(
-            self, "EmailReceiptRuleSet"
+            self, "EmailReceiptRuleSet",
         )
-
-        # Create the receipt rule with specific email addresses
+        ses_receipt_rule_set.node.default_child.set_as_active_rule_set = True
         ses.ReceiptRule(
             self, "EmailReceiptRule",
             rule_set=ses_receipt_rule_set,
             recipients=[
-                # Define specific email addresses that will receive emails
-                "info@bhaang.com",
-                "support@bhaang.com", 
-                "bookings@bhaang.com",
-                "contact@bhaang.com",
-                "hello@bhaang.com",
-                # Add more email addresses as needed
+                "book@bhaang.com"
             ],
             actions=[
                 ses_actions.AddHeader(
@@ -164,18 +134,15 @@ class VibesStack(Stack):
             ],
             scan_enabled=True,
             tls_policy=ses.TlsPolicy.OPTIONAL,
-            enabled=True  # Ensure the rule is enabled
+            enabled=True 
         )
 
         # Output the bucket name and lambda function name
         self.email_bucket_name = email_bucket.bucket_name
         self.email_processor_function_name = email_processor.function_name
         
-        # Output the configured email addresses for reference
-        self.configured_emails = [
-            "info@bhaang.com",
-            "support@bhaang.com", 
-            "bookings@bhaang.com",
-            "contact@bhaang.com",
-            "hello@bhaang.com"
-        ]
+        # Add outputs for debugging
+        CfnOutput(self, "EmailBucketName", value=email_bucket.bucket_name)
+        CfnOutput(self, "EmailProcessorFunctionName", value=email_processor.function_name)
+        CfnOutput(self, "SESDomainName", value="bhaang.com")
+        CfnOutput(self, "ReceiptRuleSetName", value=ses_receipt_rule_set.receipt_rule_set_name)

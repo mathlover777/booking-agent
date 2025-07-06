@@ -56,3 +56,48 @@ command.
  * `cdk docs`        open CDK documentation
 
 Enjoy!
+
+## Email Processing Setup
+
+This project sets up an email processing system using AWS SES, S3, and Lambda. The system receives emails for `bhaang.com` and processes them through a Lambda function.
+
+### Deployment Workflow
+
+**Option 1: Two-step deployment**
+1. **Deploy the CDK stack:**
+   ```bash
+   make deploy
+   ```
+
+2. **Set up SES domain records (after deployment):**
+   ```bash
+   # Install development dependencies
+   pip install -r requirements-dev.txt
+   
+   # Run the SES domain setup script using Makefile
+   make setup-ses-domain
+   ```
+
+**Option 2: Complete deployment in one command**
+```bash
+make deploy-with-ses
+```
+
+   The SES domain setup script will:
+   - Get the domain verification token from SES
+   - Wait for SES to generate DKIM tokens (up to 3 minutes)
+   - Create the necessary TXT and CNAME records in Route53
+   - Verify the changes are applied
+
+### Architecture
+
+- **S3 Bucket**: Stores incoming emails with `.eml` extension
+- **SES Domain**: Configured for `bhaang.com` with receiving rules
+- **Lambda Function**: Processes emails when they arrive in S3
+- **Route53**: DNS records for email routing and authentication
+
+### Notes
+
+- SES domain records (verification TXT and DKIM CNAME) are created separately after deployment because the tokens are not immediately available during CDK deployment
+- The system is configured for the `ap-south-1` region
+- All emails sent to `@bhaang.com` will be processed by the Lambda function
