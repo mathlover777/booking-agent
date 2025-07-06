@@ -19,7 +19,8 @@ def test_real_s3_email():
     
     # Get bucket name from env
     bucket_name = os.getenv('EMAIL_BUCKET_NAME', 'vibes-email-bucket-dev')
-    s3_key = "dev/emails/8m5bkklpcn2v8b98gj81633qgdhcj64ucqh3c201"
+    # s3_key = "dev/emails/8m5bkklpcn2v8b98gj81633qgdhcj64ucqh3c201"
+    s3_key = "dev/emails/u3oas0q0uphp43s1g6hrgb38ogiotnvblhbc5v01"
     
     print(f"Testing with bucket: {bucket_name}")
     print(f"Testing with key: {s3_key}")

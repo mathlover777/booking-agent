@@ -42,6 +42,7 @@ Your goals:
    - If confirming a specific slot → use the book_event tool to create the event
    - If cancelling → acknowledge the cancellation request
    - If unclear → proactively offer to check availability for the next week and show available slots
+   - **IMPORTANT**: If a tool returns an error with "User not found", try with a different email address from the thread. This means the calendar owner you selected doesn't have their calendar connected. Try other participants in the email thread until you find one with a connected calendar.
 
 4. **Final response**:
    - Provide a human-readable email reply that addresses the user's request
@@ -57,7 +58,16 @@ Your goals:
    - Exclude `{booking_email}` from the `email_ids` array since you'll be sending from that address
    - **Always end your response with**: "By VibeCal" as the signature
 
-5. **Email analysis tips**:
+5. **Error handling for calendar tools**:
+   - If get_availability or book_event returns {{"error": "User not found", "message": "..."}}, this means the email address you tried doesn't have a calendar connected
+   - In this case, try the same operation with a different email address from the email thread
+   - Look at all email addresses in the thread (from, to, cc fields) and try them one by one until you find one that works
+   - Do NOT try the booking email ({booking_email}) - it's the AI assistant's email
+   - Only give up if you've tried all email addresses in the thread and none have connected calendars
+   - This is NOT a system error - it's a normal case where someone's calendar isn't connected
+   - When you find a working calendar, proceed with the normal response flow
+
+6. **Email analysis tips**:
    - Use Return-Path as the most reliable sender identifier
    - Extract current message (before quoted text starting with ">")
    - Remove email signatures (lines starting with "--" or containing "Regards,")
@@ -179,6 +189,39 @@ def _extract_clean_email(email_addr: str) -> str:
         return match.group(1)
     
     return email_addr
+
+
+def get_all_email_addresses_from_thread(parsed_email: dict) -> List[str]:
+    """
+    Extract all unique email addresses from the email thread.
+    
+    Args:
+        parsed_email: Parsed email data from parse_email_from_s3
+    
+    Returns:
+        List of clean email addresses (excluding booking email)
+    """
+    booking_email = os.getenv('BOOKING_EMAIL', 'book@bhaang.com')
+    all_emails = set()
+    
+    # Add sender (from field)
+    from_addresses = parsed_email.get('from', [])
+    for email_addr in from_addresses:
+        clean_email = _extract_clean_email(email_addr)
+        if clean_email and clean_email.lower() != booking_email.lower():
+            all_emails.add(clean_email)
+    
+    # Add all recipients (to + cc) except booking email
+    to_addresses = parsed_email.get('to', [])
+    cc_addresses = parsed_email.get('cc', [])
+    
+    for email_addr in to_addresses + cc_addresses:
+        clean_email = _extract_clean_email(email_addr)
+        if (clean_email and 
+            clean_email.lower() != booking_email.lower()):
+            all_emails.add(clean_email)
+    
+    return list(all_emails)
 
 
 def process_email_with_ai(s3_bucket: str, s3_key: str) -> dict:

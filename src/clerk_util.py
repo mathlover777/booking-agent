@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 
-def get_user_by_email(email: str) -> str:
+def get_user_by_email(email: str) -> Optional[str]:
     """
     Fetch a user object from Clerk API by email address.
     
@@ -31,10 +31,10 @@ def get_user_by_email(email: str) -> str:
         email: Email address to search for
     
     Returns:
-        User ID if found
+        User ID if found, None if not found
     
     Raises:
-        Exception: If no user is found with the given email
+        Exception: If there's an API error (not for user not found)
     """
     try:
         # URL encode the email address
@@ -48,7 +48,8 @@ def get_user_by_email(email: str) -> str:
         data = response.json()
         
         if not data:
-            raise Exception(f"No user found with email: {email}")
+            logger.info(f"No user found with email: {email}")
+            return None
         
         # Return the first user's ID (assuming at most one return as specified)
         return data[0]["id"]
@@ -379,6 +380,11 @@ def get_availability(owner_email: str, start_date: str, end_date: str) -> Dict[s
     """
     try:
         user_id = get_user_by_email(owner_email)
+        if user_id is None:
+            return {
+                "error": "User not found",
+                "message": f"No user found with email: {owner_email}"
+            }
         return get_availability_low_level(user_id, start_date, end_date)
     except Exception as e:
         logger.error(f"Error in get_availability for {owner_email}: {e}")
@@ -415,6 +421,11 @@ def book_event(
     """
     try:
         user_id = get_user_by_email(owner_email)
+        if user_id is None:
+            return {
+                "error": "User not found",
+                "message": f"No user found with email: {owner_email}"
+            }
         return book_event_low_level(
             user_id=user_id,
             start_date=date,
@@ -446,6 +457,11 @@ def cancel_event(owner_email: str, event_id: str, notify_attendees: bool = True)
     """
     try:
         user_id = get_user_by_email(owner_email)
+        if user_id is None:
+            return {
+                "error": "User not found",
+                "message": f"No user found with email: {owner_email}"
+            }
         return cancel_event_low_level(user_id, event_id, notify_attendees)
     except Exception as e:
         logger.error(f"Error in cancel_event for {owner_email}: {e}")
@@ -458,7 +474,7 @@ CALENDAR_TOOLS = [
         "type": "function",
         "function": {
             "name": "get_availability",
-            "description": "Fetch calendar availability for a given date range using email address",
+            "description": "Fetch calendar availability for a given date range using email address. Returns error if user not found in system.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -483,7 +499,7 @@ CALENDAR_TOOLS = [
         "type": "function",
         "function": {
             "name": "book_event",
-            "description": "Book an event in the calendar using email address",
+            "description": "Book an event in the calendar using email address. Returns error if user not found in system.",
             "parameters": {
                 "type": "object",
                 "properties": {
