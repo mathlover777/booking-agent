@@ -103,3 +103,16 @@ test-email: ## Test email processing with default S3 key
 test-clerk: ## Test Clerk OAuth token retrieval
 	@echo "Testing Clerk OAuth token retrieval..."
 	cd src && python test_clerk_util.py
+
+# Calendar tools tests
+test-calendar-bookings: ## Test calendar bookings retrieval
+	@echo "Testing calendar bookings retrieval..."
+	cd src && python -c "from test_calendar_tools import test_get_bookings; test_get_bookings()"
+
+test-calendar-book: ## Test calendar event booking
+	@echo "Testing calendar event booking..."
+	cd src && python -c "from test_calendar_tools import test_book_event; test_book_event()"
+
+test-calendar-cancel: ## Test calendar event cancellation
+	@echo "Testing calendar event cancellation..."
+	cd src && python -c "from test_calendar_tools import test_cancel_event; test_cancel_event()"
