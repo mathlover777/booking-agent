@@ -56,6 +56,19 @@ class EmailProcessorStack(Stack):
         # Add S3 read permissions to the lambda role
         email_bucket.grant_read(lambda_role)
 
+        # Add Secrets Manager permissions for Clerk secret key
+        lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "secretsmanager:GetSecretValue"
+                ],
+                resources=[
+                    f"arn:aws:secretsmanager:{self.region}:{self.account}:secret:{stage}/vibecal*"
+                ]
+            )
+        )
+
         # Lambda function for email processing
         email_processor = lambda_.Function(
             self, f"EmailProcessor{stage.title()}",

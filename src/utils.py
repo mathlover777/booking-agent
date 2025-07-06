@@ -56,6 +56,7 @@ def extract_conversation_from_body(email_body: str) -> str:
     Extract the full conversation history from email body
     Returns the conversation as a text block
     """
+    print(f"DEBUG: Extracting conversation from body: {email_body}")
     if not email_body:
         return ""
     

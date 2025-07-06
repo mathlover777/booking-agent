@@ -37,3 +37,5 @@ cdk.out/
 
 # MacOS
 .DS_Store
+
+.env.*

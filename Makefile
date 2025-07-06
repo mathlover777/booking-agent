@@ -18,7 +18,7 @@ CDK_BOOTSTRAP = $(CDK) bootstrap
 COMMON_STACK = VibesCommonStack
 EMAIL_PROCESSOR_STACK = VibesEmailProcessorStack$(STAGE)
 
-.PHONY: help bootstrap deploy-common deploy-processor deploy-all destroy-processor destroy-common destroy-all diff-processor diff-common synth setup-ses clean
+.PHONY: help bootstrap deploy-common deploy-processor deploy-all destroy-processor destroy-common destroy-all diff-processor diff-common synth setup-ses clean test-email test-clerk
 
 help: ## Show this help message
 	@echo "Vibes CDK Project - Multi-stage deployment"
@@ -98,3 +98,8 @@ test-staging: deploy-stage
 test-email: ## Test email processing with default S3 key
 	@echo "Testing email processing..."
 	cd src && python test_email_processor.py
+
+# Clerk utility test
+test-clerk: ## Test Clerk OAuth token retrieval
+	@echo "Testing Clerk OAuth token retrieval..."
+	cd src && python test_clerk_util.py
