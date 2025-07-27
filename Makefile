@@ -170,3 +170,7 @@ test-update-user-email: ## Test PUT /user/email endpoint
 test-jwt-authorizer: ## Test JWT authorizer function
 	@echo "Testing JWT authorizer function..."
 	cd src && python -c "from test_user_email_api import test_jwt_authorizer; test_jwt_authorizer()"
+
+test-email-availability: ## Test POST /user/email endpoint for email availability check
+	@echo "Testing POST /user/email endpoint for email availability check..."
+	cd src && python -c "from test_user_email_api import test_check_email_availability; test_check_email_availability()"

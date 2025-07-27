@@ -33,6 +33,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return get_user_email(user_id)
         elif http_method == 'PUT':
             return update_user_email(user_id, event)
+        elif http_method == 'POST':
+            return check_email_availability(user_id, event)
         else:
             return create_error_response(405, f"Method {http_method} not allowed")
             
@@ -66,7 +68,7 @@ def get_user_email(user_id: str) -> Dict[str, Any]:
                 'Content-Type': 'application/json',
                 'Access-Control-Allow-Origin': '*',
                 'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-                'Access-Control-Allow-Methods': 'GET,PUT,OPTIONS'
+                'Access-Control-Allow-Methods': 'GET,PUT,POST,OPTIONS'
             },
             'body': json.dumps({
                 'user_id': user_id,
@@ -100,6 +102,26 @@ def update_user_email(user_id: str, event: Dict[str, Any]) -> Dict[str, Any]:
         pk = f"uid:{user_id}"
         sk = "data"
         now = datetime.utcnow().isoformat()
+        
+        # Check if email already exists for another user using GSI
+        email_check_response = table.query(
+            IndexName="assist_email-index",
+            KeyConditionExpression="assist_email = :email",
+            ExpressionAttributeValues={
+                ':email': assist_email
+            }
+        )
+        
+        existing_email_items = email_check_response.get('Items', [])
+        
+        # Filter out the current user's record if it exists
+        other_users_with_email = [
+            item for item in existing_email_items 
+            if item.get('user_id') != user_id
+        ]
+        
+        if other_users_with_email:
+            return create_error_response(409, "Email already exists for another user")
         
         # Check if user already exists
         existing_response = table.get_item(
@@ -153,7 +175,7 @@ def update_user_email(user_id: str, event: Dict[str, Any]) -> Dict[str, Any]:
                 'Content-Type': 'application/json',
                 'Access-Control-Allow-Origin': '*',
                 'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-                'Access-Control-Allow-Methods': 'GET,PUT,OPTIONS'
+                'Access-Control-Allow-Methods': 'GET,PUT,POST,OPTIONS'
             },
             'body': json.dumps({
                 'user_id': user_id,
@@ -171,6 +193,63 @@ def update_user_email(user_id: str, event: Dict[str, Any]) -> Dict[str, Any]:
         return create_error_response(500, "Error updating user email")
 
 
+def check_email_availability(user_id: str, event: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Check if an email is available for use by the current user
+    """
+    try:
+        # Parse request body
+        body = json.loads(event.get('body', '{}'))
+        assist_email = body.get('assist_email')
+        
+        if not assist_email:
+            return create_error_response(400, "assist_email is required")
+        
+        # Validate email format (basic validation)
+        if '@' not in assist_email or '.' not in assist_email:
+            return create_error_response(400, "Invalid email format")
+        
+        # Check if email already exists for another user using GSI
+        email_check_response = table.query(
+            IndexName="assist_email-index",
+            KeyConditionExpression="assist_email = :email",
+            ExpressionAttributeValues={
+                ':email': assist_email
+            }
+        )
+        
+        existing_email_items = email_check_response.get('Items', [])
+        
+        # Filter out the current user's record if it exists
+        other_users_with_email = [
+            item for item in existing_email_items 
+            if item.get('user_id') != user_id
+        ]
+        
+        is_available = len(other_users_with_email) == 0
+        
+        return {
+            'statusCode': 200,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+                'Access-Control-Allow-Methods': 'GET,PUT,POST,OPTIONS'
+            },
+            'body': json.dumps({
+                'email': assist_email,
+                'available': is_available,
+                'message': 'Email is available' if is_available else 'Email is already in use by another user'
+            })
+        }
+        
+    except json.JSONDecodeError:
+        return create_error_response(400, "Invalid JSON in request body")
+    except Exception as e:
+        logger.error(f"Error checking email availability: {str(e)}")
+        return create_error_response(500, "Error checking email availability")
+
+
 def create_error_response(status_code: int, message: str) -> Dict[str, Any]:
     """
     Create a standardized error response
@@ -181,7 +260,7 @@ def create_error_response(status_code: int, message: str) -> Dict[str, Any]:
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-            'Access-Control-Allow-Methods': 'GET,PUT,OPTIONS'
+            'Access-Control-Allow-Methods': 'GET,PUT,POST,OPTIONS'
         },
         'body': json.dumps({
             'error': message

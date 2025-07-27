@@ -16,6 +16,7 @@ from user_email_api import lambda_handler
 
 
 user_id = "user_2zTBVQZOK5QCyxL43QTVOHOw3zK" #souravsarkar1729
+# user_id = "user_2zTBVQZOK5QCyxL43QTVOHOw3zK-dummy"
 
 def generate_clerk_jwt_token(user_id: str) -> str:
     """
@@ -139,6 +140,52 @@ def test_update_user_email():
         print(f"Error: {str(e)}")
 
 
+def test_check_email_availability():
+    """Test POST /user/email endpoint for email availability check"""
+    print("\nTesting POST /user/email (email availability check)...")
+    
+    # Test 1: Check with current user's email (should be available)
+    print("\n--- Test 1: Check with current user's email ---")
+    event1 = {
+        'httpMethod': 'POST',
+        'requestContext': {
+            'authorizer': {
+                'user_id': user_id
+            }
+        },
+        'body': json.dumps({
+            'assist_email': 'test@example.com'
+        })
+    }
+    
+    try:
+        response1 = lambda_handler(event1, None)
+        print(f"Response: {json.dumps(response1, indent=2)}")
+    except Exception as e:
+        print(f"Error: {str(e)}")
+    
+    # Test 2: Check with dummy user ID (should show as taken if email exists)
+    print("\n--- Test 2: Check with dummy user ID ---")
+    dummy_user_id = "user_2zTBVQZOK5QCyxL43QTVOHOw3zK-dummy"
+    event2 = {
+        'httpMethod': 'POST',
+        'requestContext': {
+            'authorizer': {
+                'user_id': dummy_user_id
+            }
+        },
+        'body': json.dumps({
+            'assist_email': 'test@example.com'
+        })
+    }
+    
+    try:
+        response2 = lambda_handler(event2, None)
+        print(f"Response: {json.dumps(response2, indent=2)}")
+    except Exception as e:
+        print(f"Error: {str(e)}")
+
+
 def test_jwt_authorizer():
     """Test JWT authorizer function"""
     print("\nTesting JWT Authorizer...")
@@ -176,6 +223,7 @@ if __name__ == "__main__":
     
     test_get_user_email()
     test_update_user_email()
+    test_check_email_availability()
     test_jwt_authorizer()
     
     print("\nTests completed!") 
