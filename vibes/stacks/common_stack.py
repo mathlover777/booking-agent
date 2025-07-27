@@ -1,7 +1,6 @@
 import os
 from dotenv import load_dotenv
 from aws_cdk import (
-    Duration,
     Stack,
     RemovalPolicy,
     aws_s3 as s3,

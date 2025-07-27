@@ -42,9 +42,12 @@ bootstrap: ## Bootstrap CDK in the current account/region
 clean-layer: ## Remove all files from lambda-layer/python
 	rm -rf lambda-layer/python/*
 
-install-layer-deps: ## Install Python dependencies for Lambda layer (Linux compatible)
+install-layer-deps: ## Install Python dependencies for Lambda layers (Linux compatible)
 	@echo "Installing Lambda layer dependencies..."
-	pip3 install --platform manylinux2014_x86_64 --implementation cp --python-version 3.12 --only-binary=:all: --upgrade -r requirements.txt -t lambda-layer/python/
+	@echo "Installing common dependencies..."
+	pip3 install --platform manylinux2014_x86_64 --implementation cp --python-version 3.12 --only-binary=:all: --upgrade -r layers/requirements-common.txt -t lambda-layer/common/python/
+	@echo "Installing auth dependencies..."
+	pip3 install --platform manylinux2014_x86_64 --implementation cp --python-version 3.12 --only-binary=:all: --upgrade -r layers/requirements-auth.txt -t lambda-layer/auth/python/
 
 deploy-common: clean-layer install-layer-deps ## Deploy common stack (shared across stages)
 	@echo "Deploying common stack..."
