@@ -45,12 +45,41 @@ def get_verification_token(domain: str) -> str:
     return resp["VerificationAttributes"][domain]["VerificationToken"]
 
 
-def create_dkim_changes(tokens: list[str]) -> list[dict]:
+def record_exists(hosted_zone_id: str, record_name: str, record_type: str, expected_value: str) -> bool:
+    """Check if a DNS record already exists with the expected value."""
+    try:
+        response = route53.list_resource_record_sets(
+            HostedZoneId=hosted_zone_id,
+            StartRecordName=record_name,
+            StartRecordType=record_type,
+            MaxItems='1'
+        )
+        
+        for record in response.get('ResourceRecordSets', []):
+            if (record['Name'] == record_name and 
+                record['Type'] == record_type and
+                record.get('ResourceRecords')):
+                for resource_record in record['ResourceRecords']:
+                    if resource_record['Value'] == expected_value:
+                        return True
+        return False
+    except Exception as e:
+        print(f"Error checking if record exists: {e}")
+        return False
+
+
+def create_dkim_changes(tokens: list[str], hosted_zone_id: str) -> list[dict]:
     """Create Route53 change records for DKIM CNAME records."""
     changes = []
     for token in tokens:
         record_name = f"{token}._domainkey.{DOMAIN}."
         target = f"{token}.dkim.amazonses.com."
+        
+        # Check if record already exists
+        if record_exists(hosted_zone_id, record_name, "CNAME", target):
+            print(f"DKIM record {record_name} -> {target} already exists, skipping")
+            continue
+            
         print(f"Creating DKIM record {record_name} -> {target}")
         changes.append({
             "Action": "UPSERT",
@@ -64,17 +93,24 @@ def create_dkim_changes(tokens: list[str]) -> list[dict]:
     return changes
 
 
-def create_verification_changes(verification_token: str) -> list[dict]:
+def create_verification_changes(verification_token: str, hosted_zone_id: str) -> list[dict]:
     """Create Route53 change records for domain verification TXT record."""
     record_name = f"_amazonses.{DOMAIN}."
-    print(f"Creating verification record {record_name} -> {verification_token}")
+    expected_value = f'"{verification_token}"'
+    
+    # Check if record already exists
+    if record_exists(hosted_zone_id, record_name, "TXT", expected_value):
+        print(f"Verification record {record_name} -> {expected_value} already exists, skipping")
+        return []
+        
+    print(f"Creating verification record {record_name} -> {expected_value}")
     return [{
         "Action": "UPSERT",
         "ResourceRecordSet": {
             "Name": record_name,
             "Type": "TXT",
             "TTL": 300,
-            "ResourceRecords": [{"Value": f'"{verification_token}"'}]
+            "ResourceRecords": [{"Value": expected_value}]
         }
     }]
 
@@ -82,7 +118,7 @@ def create_verification_changes(verification_token: str) -> list[dict]:
 def apply_route53_changes(hosted_zone_id: str, changes: list[dict]):
     """Apply the Route53 changes."""
     if not changes:
-        print("No DKIM changes to apply.")
+        print("No changes to apply - all records already exist.")
         return
     
     resp = route53.change_resource_record_sets(
@@ -104,6 +140,15 @@ def set_active_receipt_rule_set():
         if not rule_set_name:
             print("Warning: RECEIPT_RULE_SET_NAME not found in environment. Skipping rule set activation.")
             return
+        
+        # Check if this rule set is already active
+        try:
+            active_rule_set = ses.describe_active_receipt_rule_set()
+            if active_rule_set.get('Metadata', {}).get('Name') == rule_set_name:
+                print(f"Receipt rule set '{rule_set_name}' is already active")
+                return
+        except ses.exceptions.ReceiptRuleSetDoesNotExistException:
+            pass  # No active rule set, which is fine
         
         print(f"Setting receipt rule set '{rule_set_name}' as active...")
         
@@ -145,10 +190,10 @@ def main():
         else:
             raise TimeoutError("DKIM tokens not available after waiting 3 minutes.")
 
-        # Create all changes
+        # Create all changes (with idempotency checks)
         all_changes = []
-        all_changes.extend(create_verification_changes(verification_token))
-        all_changes.extend(create_dkim_changes(tokens))
+        all_changes.extend(create_verification_changes(verification_token, zone_id))
+        all_changes.extend(create_dkim_changes(tokens, zone_id))
         
         # Apply all changes
         apply_route53_changes(zone_id, all_changes)

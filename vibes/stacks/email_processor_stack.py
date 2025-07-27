@@ -200,14 +200,12 @@ class EmailProcessorStack(Stack):
             s3.NotificationKeyFilter(prefix=f"{stage}/emails/")  # Stage-specific prefix
         )
 
-        # SES ReceiptRule with stage-specific email address
-        # Use BOOKING_EMAIL directly from environment variable
-        recipient_email = os.getenv('BOOKING_EMAIL')
-        
+        # SES ReceiptRule for all emails to the domain
+        # This captures all emails to @DOMAIN_NAME, then Lambda determines the user
         ses.ReceiptRule(
             self, f"EmailReceiptRule{stage.title()}",
             rule_set=ses_receipt_rule_set,
-            recipients=[recipient_email],
+            recipients=[os.getenv('DOMAIN_NAME')],  # All emails to @DOMAIN_NAME
             actions=[
                 ses_actions.AddHeader(
                     name="X-SES-RECEIPT-RULE",
@@ -229,6 +227,7 @@ class EmailProcessorStack(Stack):
             self, f"VibesApi{stage.title()}",
             rest_api_name=f"vibes-api-{stage}",
             description=f"Vibes API for {stage} environment",
+            endpoint_types=[apigateway.EndpointType.REGIONAL],
             default_cors_preflight_options=apigateway.CorsOptions(
                 allow_origins=apigateway.Cors.ALL_ORIGINS,
                 allow_methods=apigateway.Cors.ALL_METHODS,
@@ -274,7 +273,7 @@ class EmailProcessorStack(Stack):
         CfnOutput(self, f"JwtAuthorizerFunctionName{stage.title()}", 
                  value=jwt_authorizer.function_name)
         CfnOutput(self, f"StageEmailAddress{stage.title()}", 
-                 value=recipient_email)
+                 value=os.getenv('DOMAIN_NAME'))
         CfnOutput(self, f"StageS3Prefix{stage.title()}", 
                  value=f"{stage}/emails/")
         CfnOutput(self, f"ApiGatewayUrl{stage.title()}", 

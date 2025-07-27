@@ -15,6 +15,8 @@ import requests
 from user_email_api import lambda_handler
 
 
+user_id = "user_2zTBVQZOK5QCyxL43QTVOHOw3zK" #souravsarkar1729
+
 def generate_clerk_jwt_token(user_id: str) -> str:
     """
     Generate a JWT token using Clerk's API for testing purposes
@@ -95,7 +97,7 @@ def test_get_user_email():
         'httpMethod': 'GET',
         'requestContext': {
             'authorizer': {
-                'user_id': 'test_user_123'
+                'user_id': user_id
             }
         }
     }
@@ -120,7 +122,7 @@ def test_update_user_email():
         'httpMethod': 'PUT',
         'requestContext': {
             'authorizer': {
-                'user_id': 'test_user_123'
+                'user_id': user_id
             }
         },
         'body': json.dumps({
@@ -128,8 +130,6 @@ def test_update_user_email():
         })
     }
     
-    # Set environment variables for testing
-    os.environ['USER_EMAILS_TABLE_NAME'] = 'vibes-user-emails-dev'
     os.environ['LOG_LEVEL'] = 'INFO'
     
     try:
@@ -144,8 +144,6 @@ def test_jwt_authorizer():
     print("\nTesting JWT Authorizer...")
     
     from jwt_authorizer import lambda_handler as auth_handler
-
-    user_id = "user_2zTBVQZOK5QCyxL43QTVOHOw3zK" #souravsarkar1729
     
     try:
         # Generate a proper JWT token using Clerk's API
