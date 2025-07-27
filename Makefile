@@ -39,8 +39,9 @@ help: ## Show this help message
 bootstrap: ## Bootstrap CDK in the current account/region
 	$(CDK_BOOTSTRAP) --profile $(AWS_PROFILE)
 
-clean-layer: ## Remove all files from lambda-layer/python
-	rm -rf lambda-layer/python/*
+clean-layer: ## Remove all files from lambda-layer directories
+	rm -rf lambda-layer/common/python/*
+	rm -rf lambda-layer/auth/python/*
 
 install-layer-deps: ## Install Python dependencies for Lambda layers (Linux compatible)
 	@echo "Installing Lambda layer dependencies..."
@@ -48,6 +49,13 @@ install-layer-deps: ## Install Python dependencies for Lambda layers (Linux comp
 	pip3 install --platform manylinux2014_x86_64 --implementation cp --python-version 3.12 --only-binary=:all: --upgrade -r layers/requirements-common.txt -t lambda-layer/common/python/
 	@echo "Installing auth dependencies..."
 	pip3 install --platform manylinux2014_x86_64 --implementation cp --python-version 3.12 --only-binary=:all: --upgrade -r layers/requirements-auth.txt -t lambda-layer/auth/python/
+
+install-local-deps: ## Install Python dependencies locally for development
+	@echo "Installing local Python dependencies..."
+	@echo "Installing common dependencies..."
+	pip3 install -r layers/requirements-common.txt
+	@echo "Installing auth dependencies..."
+	pip3 install -r layers/requirements-auth.txt
 
 deploy-common: clean-layer install-layer-deps ## Deploy common stack (shared across stages)
 	@echo "Deploying common stack..."
@@ -148,3 +156,17 @@ test-booking-agent: ## Test booking agent AI integration
 test-real-email: ## Test booking agent with real S3 email
 	@echo "Testing booking agent with real S3 email..."
 	cd src && python -c "from test_booking_agent import test_real_s3_email; test_real_s3_email()"
+
+# User Email API tests
+
+test-get-user-email: ## Test GET /user/email endpoint
+	@echo "Testing GET /user/email endpoint..."
+	cd src && python -c "from test_user_email_api import test_get_user_email; test_get_user_email()"
+
+test-update-user-email: ## Test PUT /user/email endpoint
+	@echo "Testing PUT /user/email endpoint..."
+	cd src && python -c "from test_user_email_api import test_update_user_email; test_update_user_email()"
+
+test-jwt-authorizer: ## Test JWT authorizer function
+	@echo "Testing JWT authorizer function..."
+	cd src && python -c "from test_user_email_api import test_jwt_authorizer; test_jwt_authorizer()"
