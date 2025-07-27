@@ -12,6 +12,9 @@ from aws_cdk import (
     aws_ses_actions as ses_actions,
     aws_apigateway as apigateway,
     aws_dynamodb as dynamodb,
+    aws_route53 as route53,
+    aws_route53_targets as targets,
+    aws_certificatemanager as acm,
     CfnOutput,
     Fn,
 )
@@ -222,6 +225,15 @@ class EmailProcessorStack(Stack):
             enabled=True 
         )
 
+        # Import SSL certificate
+        certificate = acm.Certificate.from_certificate_arn(
+            self, f"ApiCertificate{stage.title()}",
+            certificate_arn=os.getenv('CERTIFICATE')
+        )
+
+        # Create custom domain name
+        custom_domain_name = f"{os.getenv('BACKEND_SUBDOMAIN')}-{stage}.{os.getenv('DOMAIN_NAME')}"
+        
         # Create API Gateway
         api = apigateway.RestApi(
             self, f"VibesApi{stage.title()}",
@@ -232,6 +244,39 @@ class EmailProcessorStack(Stack):
                 allow_origins=apigateway.Cors.ALL_ORIGINS,
                 allow_methods=apigateway.Cors.ALL_METHODS,
                 allow_headers=["*"]
+            )
+        )
+
+        # Create custom domain for API Gateway
+        custom_domain = apigateway.DomainName(
+            self, f"ApiCustomDomain{stage.title()}",
+            domain_name=custom_domain_name,
+            certificate=certificate,
+            endpoint_type=apigateway.EndpointType.REGIONAL,
+            security_policy=apigateway.SecurityPolicy.TLS_1_2
+        )
+
+        # Create base path mapping
+        apigateway.BasePathMapping(
+            self, f"ApiBasePathMapping{stage.title()}",
+            domain_name=custom_domain,
+            rest_api=api,
+            base_path=None  # Root path mapping
+        )
+
+        # Import the hosted zone for Route53
+        hosted_zone = route53.HostedZone.from_lookup(
+            self, f"HostedZone{stage.title()}",
+            domain_name=os.getenv('DOMAIN_NAME')
+        )
+
+        # Create Route53 A record pointing to the custom domain
+        route53.ARecord(
+            self, f"ApiARecord{stage.title()}",
+            zone=hosted_zone,
+            record_name=f"{os.getenv('BACKEND_SUBDOMAIN')}-{stage}",
+            target=route53.RecordTarget.from_alias(
+                targets.ApiGatewayDomain(custom_domain)
             )
         )
 
@@ -262,6 +307,14 @@ class EmailProcessorStack(Stack):
             authorization_type=apigateway.AuthorizationType.CUSTOM
         )
 
+        # POST /user/email - Check email availability
+        email_resource.add_method(
+            "POST",
+            apigateway.LambdaIntegration(user_email_api),
+            authorizer=authorizer,
+            authorization_type=apigateway.AuthorizationType.CUSTOM
+        )
+
         # Grant API Gateway permission to invoke JWT authorizer Lambda
         jwt_authorizer.grant_invoke(iam.ServicePrincipal("apigateway.amazonaws.com"))
 
@@ -278,3 +331,5 @@ class EmailProcessorStack(Stack):
                  value=f"{stage}/emails/")
         CfnOutput(self, f"ApiGatewayUrl{stage.title()}", 
                  value=api.url)
+        CfnOutput(self, f"ApiCustomDomainUrl{stage.title()}", 
+                 value=f"https://{custom_domain_name}")

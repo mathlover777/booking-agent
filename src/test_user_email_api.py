@@ -196,14 +196,14 @@ def test_jwt_authorizer():
         # Generate a proper JWT token using Clerk's API
         print(f"🔑 [DEBUG] Generating JWT token for user: {user_id}")
         jwt_token = generate_clerk_jwt_token(user_id)
+        print(f"🔑 [DEBUG] JWT token: {jwt_token}")
         print(f"🔑 [DEBUG] Generated JWT token: {jwt_token[:50]}...")
         
         # Mock event for authorizer with real JWT token
         event = {
-            'headers': {
-                'Authorization': f'Bearer {jwt_token}'
-            },
-            'methodArn': 'arn:aws:execute-api:us-east-1:123456789012:api123/test/GET/user/email'
+            'type': 'TOKEN',
+            'authorizationToken': f'Bearer {jwt_token}',
+            'methodArn': 'arn:aws:execute-api:ap-south-1:730746788960:5cl4p4az01/prod/GET/user/email'
         }
         
         # Set environment variables for testing

@@ -15,10 +15,10 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     Validates Clerk JWT tokens and returns user information
     """
     try:
-        # Extract token from Authorization header
-        auth_header = event.get('headers', {}).get('Authorization', '')
+        # Extract token from authorizationToken
+        auth_header = event.get('authorizationToken', '')
         if not auth_header.startswith('Bearer '):
-            logger.warning("No Bearer token found in Authorization header")
+            logger.warning("No Bearer token found in authorizationToken")
             return generate_policy('user', 'Deny', event['methodArn'])
         
         token = auth_header.split(' ')[1]
@@ -30,7 +30,11 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return generate_policy('user', 'Deny', event['methodArn'])
         
         # Generate allow policy with user context
-        policy = generate_policy('user', 'Allow', event['methodArn'])
+        # Extract the base ARN and add wildcard for all resources
+        method_arn = event['methodArn']
+        base_arn = '/'.join(method_arn.split('/')[:-3]) + '/*'
+        
+        policy = generate_policy('user', 'Allow', base_arn)
         policy['context'] = {
             'user_id': user_id
         }
