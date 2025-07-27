@@ -99,6 +99,9 @@ def update_user_email(user_id: str, event: Dict[str, Any]) -> Dict[str, Any]:
         if '@' not in assist_email or '.' not in assist_email:
             return create_error_response(400, "Invalid email format")
         
+        # Convert email to lowercase for case-insensitive storage and search
+        assist_email = assist_email.lower()
+        
         pk = f"uid:{user_id}"
         sk = "data"
         now = datetime.utcnow().isoformat()
@@ -208,6 +211,9 @@ def check_email_availability(user_id: str, event: Dict[str, Any]) -> Dict[str, A
         # Validate email format (basic validation)
         if '@' not in assist_email or '.' not in assist_email:
             return create_error_response(400, "Invalid email format")
+        
+        # Convert email to lowercase for case-insensitive search
+        assist_email = assist_email.lower()
         
         # Check if email already exists for another user using GSI
         email_check_response = table.query(
