@@ -5,11 +5,11 @@ Tests with real S3 email.
 """
 
 from dotenv import load_dotenv
-load_dotenv('../.env.base', override=True)
-load_dotenv('../.env.dev', override=True)
+load_dotenv('../../.env.base', override=True)
+load_dotenv('../../.env.dev', override=True)
 
 import os
-from booking_agent.agent import process_email_with_ai
+from .agent import process_email_with_ai
 
 
 def test_real_s3_email():

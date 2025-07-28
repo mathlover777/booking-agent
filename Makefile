@@ -117,10 +117,10 @@ test-email: ## Test email processing and auto-reply with default S3 key
 	@echo "Testing email processing and auto-reply..."
 	cd src && python test_email_processor.py
 
-# Clerk utility test
-test-clerk: ## Test Clerk OAuth token retrieval
-	@echo "Testing Clerk OAuth token retrieval..."
-	cd src && python test_clerk_util.py
+# Calendar utility test
+test-calendar-util: ## Test calendar utility functions
+	@echo "Testing calendar utility functions..."
+	cd src && python -m calendar.test_calendar_util
 
 # Calendar tools tests
 test-calendar-bookings: ## Test calendar bookings retrieval
@@ -135,18 +135,7 @@ test-calendar-cancel: ## Test calendar event cancellation
 	@echo "Testing calendar event cancellation..."
 	cd src && python -c "from test_calendar_tools import test_cancel_event; test_cancel_event()"
 
-# High-level calendar function tests
-test-high-level-availability: ## Test high-level get_availability function
-	@echo "Testing high-level get_availability function..."
-	cd src && python -c "from test_calendar_tools import test_high_level_get_availability; test_high_level_get_availability()"
 
-test-high-level-book: ## Test high-level book_event function
-	@echo "Testing high-level book_event function..."
-	cd src && python -c "from test_calendar_tools import test_high_level_book_event; test_high_level_book_event()"
-
-test-high-level-cancel: ## Test high-level cancel_event function
-	@echo "Testing high-level cancel_event function..."
-	cd src && python -c "from test_calendar_tools import test_high_level_cancel_event; test_high_level_cancel_event()"
 
 # Booking agent AI tests
 test-booking-agent: ## Test booking agent AI integration

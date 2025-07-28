@@ -1,6 +1,6 @@
 import json
 import boto3
-from booking_agent import process_email_with_ai
+from booking_agent.agent import process_email_with_ai
 
 
 def lambda_handler(event, context):
@@ -22,7 +22,7 @@ def lambda_handler(event, context):
     print("=" * 80)
     print("AI PROCESSING RESULT:")
     print("=" * 80)
-    print(json.dumps(result, indent=2, ensure_ascii=False))
+    print(json.dumps(result, ensure_ascii=False))
     print("=" * 80)
     
     if result['action'] == 'processed':
