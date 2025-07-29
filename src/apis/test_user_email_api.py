@@ -3,8 +3,8 @@
 Test script for user email API Lambda function
 """
 from dotenv import load_dotenv
-load_dotenv('../.env.base', override=True)
-load_dotenv('../.env.dev', override=True)
+load_dotenv('../../.env.base', override=True)
+load_dotenv('../../.env.dev', override=True)
 import os
 STAGE = os.environ.get('STAGE', 'dev')
 os.environ['USER_EMAILS_TABLE_NAME'] = f'vibes-user-emails-{STAGE}'
@@ -109,7 +109,17 @@ def test_get_user_email():
     
     try:
         response = lambda_handler(event, None)
-        print(f"Response: {json.dumps(response, indent=2)}")
+        print(f"Status Code: {response.get('statusCode')}")
+        print(f"Headers: {json.dumps(response.get('headers', {}), indent=2)}")
+        
+        # Extract and pretty print the body
+        body = response.get('body', '{}')
+        try:
+            body_json = json.loads(body)
+            print(f"Body: {json.dumps(body_json, indent=2)}")
+        except json.JSONDecodeError:
+            print(f"Body (raw): {body}")
+            
     except Exception as e:
         print(f"Error: {str(e)}")
 
@@ -135,7 +145,17 @@ def test_update_user_email():
     
     try:
         response = lambda_handler(event, None)
-        print(f"Response: {json.dumps(response, indent=2)}")
+        print(f"Status Code: {response.get('statusCode')}")
+        print(f"Headers: {json.dumps(response.get('headers', {}), indent=2)}")
+        
+        # Extract and pretty print the body
+        body = response.get('body', '{}')
+        try:
+            body_json = json.loads(body)
+            print(f"Body: {json.dumps(body_json, indent=2)}")
+        except json.JSONDecodeError:
+            print(f"Body (raw): {body}")
+            
     except Exception as e:
         print(f"Error: {str(e)}")
 
@@ -160,7 +180,17 @@ def test_check_email_availability():
     
     try:
         response1 = lambda_handler(event1, None)
-        print(f"Response: {json.dumps(response1, indent=2)}")
+        print(f"Status Code: {response1.get('statusCode')}")
+        print(f"Headers: {json.dumps(response1.get('headers', {}), indent=2)}")
+        
+        # Extract and pretty print the body
+        body = response1.get('body', '{}')
+        try:
+            body_json = json.loads(body)
+            print(f"Body: {json.dumps(body_json, indent=2)}")
+        except json.JSONDecodeError:
+            print(f"Body (raw): {body}")
+            
     except Exception as e:
         print(f"Error: {str(e)}")
     
@@ -181,7 +211,17 @@ def test_check_email_availability():
     
     try:
         response2 = lambda_handler(event2, None)
-        print(f"Response: {json.dumps(response2, indent=2)}")
+        print(f"Status Code: {response2.get('statusCode')}")
+        print(f"Headers: {json.dumps(response2.get('headers', {}), indent=2)}")
+        
+        # Extract and pretty print the body
+        body = response2.get('body', '{}')
+        try:
+            body_json = json.loads(body)
+            print(f"Body: {json.dumps(body_json, indent=2)}")
+        except json.JSONDecodeError:
+            print(f"Body (raw): {body}")
+            
     except Exception as e:
         print(f"Error: {str(e)}")
 
@@ -212,18 +252,24 @@ def test_jwt_authorizer():
         os.environ['LOG_LEVEL'] = 'INFO'
         
         response = auth_handler(event, None)
-        print(f"Response: {json.dumps(response, indent=2)}")
+        print(f"Policy Document: {json.dumps(response, indent=2)}")
+        
+        # For JWT authorizer, the response is a policy document, not a typical API response
+        # So we'll just pretty print the entire response
+        if 'context' in response:
+            print(f"User Context: {json.dumps(response['context'], indent=2)}")
+            
     except Exception as e:
         print(f"Error: {str(e)}")
 
 
-if __name__ == "__main__":
-    print("Testing User Email API Lambda Functions")
-    print("=" * 50)
+# if __name__ == "__main__":
+#     print("Testing User Email API Lambda Functions")
+#     print("=" * 50)
     
-    test_get_user_email()
-    test_update_user_email()
-    test_check_email_availability()
-    test_jwt_authorizer()
+#     test_get_user_email()
+#     test_update_user_email()
+#     test_check_email_availability()
+#     test_jwt_authorizer()
     
-    print("\nTests completed!") 
+#     print("\nTests completed!") 
