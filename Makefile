@@ -117,23 +117,10 @@ test-email: ## Test email processing and auto-reply with default S3 key
 	@echo "Testing email processing and auto-reply..."
 	cd src && python test_email_processor.py
 
-# Calendar utility test
-test-calendar-util: ## Test calendar utility functions
-	@echo "Testing calendar utility functions..."
-	cd src && python -m calendar.test_calendar_util
-
-# Calendar tools tests
-test-calendar-bookings: ## Test calendar bookings retrieval
-	@echo "Testing calendar bookings retrieval..."
-	cd src && python -c "from test_calendar_tools import test_get_bookings; test_get_bookings()"
-
-test-calendar-book: ## Test calendar event booking
-	@echo "Testing calendar event booking..."
-	cd src && python -c "from test_calendar_tools import test_book_event; test_book_event()"
-
-test-calendar-cancel: ## Test calendar event cancellation
-	@echo "Testing calendar event cancellation..."
-	cd src && python -c "from test_calendar_tools import test_cancel_event; test_cancel_event()"
+# Calendar workflow test
+test-calendar: ## Test complete calendar workflow (availability, book, delete)
+	@echo "Testing complete calendar workflow..."
+	cd src && python -m calendar_utils.test_calendar_util
 
 
 

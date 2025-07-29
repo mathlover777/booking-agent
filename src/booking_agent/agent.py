@@ -4,7 +4,7 @@ import boto3
 from openai import OpenAI
 from typing import List, Optional, Dict, Any
 from datetime import datetime
-from calendar.calendar_util import _secrets, get_availability_low_level, book_event_low_level, cancel_event_low_level
+from calendar_utils.calendar_util import _secrets, get_availability_low_level, book_event_low_level, cancel_event_low_level
 from email_util import parse_email_from_s3, send_email_via_ses
 import re
 import logging
@@ -132,7 +132,7 @@ def _resolve_calendar_owner(parsed_email: Dict[str, Any]) -> Dict[str, Any]:
 # Calendar tools and assistant (imported from calendar package)
 # -----------------------------------------------------------------------------
 
-from calendar.calendar_tools import CalendarAssistant, build_calendar_tools, calendar_tool_executor
+from calendar_utils.calendar_tools import CalendarAssistant, build_calendar_tools, calendar_tool_executor
 
 # -----------------------------------------------------------------------------
 # Simplified system prompt (calendar owner already resolved)
