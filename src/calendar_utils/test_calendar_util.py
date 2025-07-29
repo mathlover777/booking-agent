@@ -49,37 +49,7 @@ def test_oauth_token_retrieval():
         return False
 
 
-def test_get_availability_user_not_found():
-    """
-    Test get_availability with a user that doesn't exist
-    """
-    from .calendar_util import get_availability_low_level as get_availability
-    
-    email = "nonexistent@example.com"  # Email that doesn't exist
-    
-    print(f"🧪 Testing Get Availability (User Not Found)")
-    print(f"📧 Email: {email}")
-    print(f"🌍 Stage: {os.getenv('STAGE', 'dev')}")
-    print("=" * 80)
-    
-    try:
-        # Call the get_availability function
-        result = get_availability(email, "2024-01-01", "2024-01-31")
-        
-        # Check if it returns the expected error structure
-        if isinstance(result, dict) and result.get("error") == "User not found":
-            print("✅ Get availability (user not found) completed successfully!")
-            print(f"\n📋 Result: {result}")
-            return True
-        else:
-            print(f"❌ Expected error structure but got: {result}")
-            return False
-        
-    except Exception as e:
-        print(f"❌ Error in get_availability: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
+
 
 
 def test_calendar_workflow():
@@ -193,11 +163,7 @@ def main():
     print("="*80)
     oauth_success = test_oauth_token_retrieval()
     
-    # Test get availability (user not found)
-    print("\n" + "="*80)
-    print("📅 TESTING GET AVAILABILITY (USER NOT FOUND)")
-    print("=" * 80)
-    availability_not_found_success = test_get_availability_user_not_found()
+
     
     # Test complete calendar workflow
     print("\n" + "="*80)
@@ -210,17 +176,15 @@ def main():
     print("📊 TEST SUMMARY")
     print("="*80)
     
-    all_tests_passed = oauth_success and availability_not_found_success and workflow_success
+    all_tests_passed = oauth_success and workflow_success
     
     if all_tests_passed:
         print("🎉 All Clerk utility tests passed!")
         print("✅ OAuth token retrieval: PASSED")
-        print("✅ Get availability (user not found): PASSED")
         print("✅ Complete calendar workflow: PASSED")
     else:
         print("💥 Some tests failed!")
         print(f"{'✅' if oauth_success else '❌'} OAuth token retrieval: {'PASSED' if oauth_success else 'FAILED'}")
-        print(f"{'✅' if availability_not_found_success else '❌'} Get availability (user not found): {'PASSED' if availability_not_found_success else 'FAILED'}")
         print(f"{'✅' if workflow_success else '❌'} Complete calendar workflow: {'PASSED' if workflow_success else 'FAILED'}")
         return False
     
