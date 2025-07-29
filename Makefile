@@ -137,17 +137,17 @@ test-real-email: ## Test booking agent with real S3 email
 
 test-get-user-email: ## Test GET /user/email endpoint
 	@echo "Testing GET /user/email endpoint..."
-	cd src/apis && python -c "from test_user_email_api import test_get_user_email; test_get_user_email()"
+	cd src && python -c "from apis.test_user_email_api import test_get_user_email; test_get_user_email()"
 
 test-update-user-email: ## Test PUT /user/email endpoint
 	@echo "Testing PUT /user/email endpoint..."
-	cd src/apis && python -c "from test_user_email_api import test_update_user_email; test_update_user_email()"
+	cd src && python -c "from apis.test_user_email_api import test_update_user_email; test_update_user_email()"
 
 test-jwt-authorizer: ## Test JWT authorizer function
 	@echo "Testing JWT authorizer function..."
-	cd src/apis && python -c "from test_user_email_api import test_jwt_authorizer; test_jwt_authorizer()"
+	cd src && python -c "from apis.test_user_email_api import test_jwt_authorizer; test_jwt_authorizer()"
 
 test-email-availability: ## Test POST /user/email endpoint for email availability check
 	@echo "Testing POST /user/email endpoint for email availability check..."
-	cd src/apis && python -c "from test_user_email_api import test_check_email_availability; test_check_email_availability()"
+	cd src && python -c "from apis.test_user_email_api import test_check_email_availability; test_check_email_availability()"
 

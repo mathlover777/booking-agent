@@ -6,13 +6,15 @@ from dotenv import load_dotenv
 load_dotenv('../../.env.base', override=True)
 load_dotenv('../../.env.dev', override=True)
 import os
+
+# Set environment variables before any imports
 STAGE = os.environ.get('STAGE', 'dev')
+os.environ['STAGE'] = STAGE
 os.environ['USER_EMAILS_TABLE_NAME'] = f'vibes-user-emails-{STAGE}'
 
 import json
-
 import requests
-from user_email_api import lambda_handler
+from apis.user_email_api import lambda_handler
 
 
 user_id = "user_2zTBVQZOK5QCyxL43QTVOHOw3zK" #souravsarkar1729
@@ -227,7 +229,7 @@ def test_jwt_authorizer():
     """Test JWT authorizer function"""
     print("\nTesting JWT Authorizer...")
     
-    from jwt_authorizer import lambda_handler as auth_handler
+    from apis.jwt_authorizer import lambda_handler as auth_handler
     
     try:
         # Generate a proper JWT token using Clerk's API
