@@ -4,13 +4,17 @@ import boto3
 from openai import OpenAI
 from typing import List, Optional, Dict, Any
 from datetime import datetime
-from calendar_utils.calendar_util import _secrets, get_availability_low_level, book_event_low_level, cancel_event_low_level
 from email_util import parse_email_from_s3, send_email_via_ses
 import re
 import logging
 
-logging.basicConfig(level=logging.INFO)
+from common_utils import aws_utils
+
+# Configure logging
 logger = logging.getLogger(__name__)
+
+# Get secrets
+_secrets = aws_utils._secrets
 
 # -----------------------------------------------------------------------------
 # Helper utilities for resolving which user's calendar should be used
@@ -19,10 +23,8 @@ logger = logging.getLogger(__name__)
 # Domain that identifies booking-agent addresses (e.g. "booking.vibecal.com")
 DOMAIN_NAME = os.getenv("DOMAIN_NAME", "booking.bhaang.com")
 
-# DynamoDB table used by user_email_api -> reuse same env var
-_DDB_TABLE_NAME = os.getenv("USER_EMAILS_TABLE_NAME")
-dynamodb = boto3.resource("dynamodb")
-_user_email_table = dynamodb.Table(_DDB_TABLE_NAME) if _DDB_TABLE_NAME else None
+# Get table from aws_utils
+_user_email_table = aws_utils.user_emails_table
 
 
 def _extract_clean_email(email_addr: str) -> str:

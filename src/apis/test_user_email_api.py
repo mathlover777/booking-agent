@@ -32,11 +32,8 @@ def generate_clerk_jwt_token(user_id: str) -> str:
     
     try:
         # Get secrets from the same source as clerk_util
-        import boto3
-        secrets_client = boto3.client('secretsmanager')
-        response = secrets_client.get_secret_value(SecretId=f"{STAGE}/vibecal")
-        secrets = json.loads(response['SecretString'])
-        clerk_secret_key = secrets["CLERK_SECRET_KEY"]
+        from common_utils import aws_utils
+        clerk_secret_key = aws_utils._secrets["CLERK_SECRET_KEY"]
         
         # Step 1: Create a session
         session_url = "https://api.clerk.com/v1/sessions"

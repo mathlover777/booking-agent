@@ -4,8 +4,9 @@ import jwt
 import logging
 from typing import Dict, Any, Optional
 
+from common_utils import aws_utils
+
 # Configure logging
-logging.basicConfig(level=getattr(logging, os.getenv('LOG_LEVEL', 'INFO')))
 logger = logging.getLogger(__name__)
 
 

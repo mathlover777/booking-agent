@@ -1,28 +1,22 @@
 import json
-import boto3
 import os
 import requests
+import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone, timedelta
-import logging
 import pytz
 from urllib.parse import quote
 
+from common_utils import aws_utils
+
 # Global variables
-STAGE = os.environ['STAGE']
-secrets_client = boto3.client('secretsmanager')
-response = secrets_client.get_secret_value(SecretId=f"{STAGE}/vibecal")
-_secrets = json.loads(response['SecretString'])
+_secrets = aws_utils._secrets
 
 # Google Calendar API base URL
 GOOGLE_CALENDAR_API_BASE = "https://www.googleapis.com/calendar/v3"
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
-
 
 def get_google_oauth_token_low_level(user_id: str) -> Optional[str]:
     """Retrieve Google OAuth token for a user from Clerk API"""

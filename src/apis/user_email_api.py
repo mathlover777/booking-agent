@@ -5,14 +5,13 @@ import logging
 from datetime import datetime
 from typing import Dict, Any, Optional
 
+from common_utils import aws_utils
+
 # Configure logging
-logging.basicConfig(level=getattr(logging, os.getenv('LOG_LEVEL', 'INFO')))
 logger = logging.getLogger(__name__)
 
-# Initialize DynamoDB client
-dynamodb = boto3.resource('dynamodb')
-table_name = os.getenv('USER_EMAILS_TABLE_NAME')
-table = dynamodb.Table(table_name)
+# Get table from aws_utils
+table = aws_utils.user_emails_table
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
