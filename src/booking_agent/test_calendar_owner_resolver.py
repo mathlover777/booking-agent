@@ -2,6 +2,8 @@ import unittest
 from unittest.mock import Mock, patch, MagicMock
 import json
 import logging
+import uuid
+import boto3
 from typing import Dict, Any
 
 import os
@@ -158,7 +160,7 @@ class TestCalendarOwnerResolver(unittest.TestCase):
         
         result = resolve_calendar_owner(self.sample_parsed_email)
         
-        self.assertEqual(result["status"], "no_mapping")
+        self.assertEqual(result["status"], "no_booking_agents_found")
         self.assertIn("No booking agent emails found", result["reason"])
     
     @patch('booking_agent.calendar_owner_resolver._list_booking_emails')
@@ -170,16 +172,20 @@ class TestCalendarOwnerResolver(unittest.TestCase):
         
         result = resolve_calendar_owner(self.sample_parsed_email)
         
-        self.assertEqual(result["status"], "no_mapping")
+        self.assertEqual(result["status"], "booking_agent_not_registered")
         self.assertIn("No valid calendar owners found", result["reason"])
     
     @patch('booking_agent.calendar_owner_resolver._list_booking_emails')
     @patch('booking_agent.calendar_owner_resolver._lookup_user_records')
     def test_resolve_calendar_owner_single_valid_owner(self, mock_lookup, mock_list):
-        """Test when exactly one valid owner is found."""
+        """Test when exactly one valid owner is found and in conversation."""
         mock_list.return_value = ["booking@bhaang.com", "booking2@bhaang.com"]
         mock_lookup.return_value = {
-            "booking@bhaang.com": {"user_id": "user123", "assist_email": "booking@bhaang.com"}
+            "booking@bhaang.com": {
+                "user_id": "user123", 
+                "assist_email": "booking@bhaang.com",
+                "user_email": "sender@example.com"  # User is in conversation (from sample_parsed_email)
+            }
         }
         
         result = resolve_calendar_owner(self.sample_parsed_email)
@@ -190,13 +196,57 @@ class TestCalendarOwnerResolver(unittest.TestCase):
     
     @patch('booking_agent.calendar_owner_resolver._list_booking_emails')
     @patch('booking_agent.calendar_owner_resolver._lookup_user_records')
+    def test_resolve_calendar_owner_owner_not_in_conversation(self, mock_lookup, mock_list):
+        """Test when booking agent exists but actual user is not in conversation."""
+        mock_list.return_value = ["booking@bhaang.com"]
+        mock_lookup.return_value = {
+            "booking@bhaang.com": {
+                "user_id": "user123", 
+                "assist_email": "booking@bhaang.com",
+                "user_email": "alice@example.com"  # User is NOT in conversation
+            }
+        }
+        
+        result = resolve_calendar_owner(self.sample_parsed_email)
+        
+        self.assertEqual(result["status"], "calendar_owner_not_in_conversation")
+        self.assertIn("actual calendar owners not in conversation", result["reason"])
+    
+    @patch('booking_agent.calendar_owner_resolver._list_booking_emails')
+    @patch('booking_agent.calendar_owner_resolver._lookup_user_records')
+    def test_resolve_calendar_owner_missing_user_email(self, mock_lookup, mock_list):
+        """Test when booking agent exists but user_email field is missing."""
+        mock_list.return_value = ["booking@bhaang.com"]
+        mock_lookup.return_value = {
+            "booking@bhaang.com": {
+                "user_id": "user123", 
+                "assist_email": "booking@bhaang.com"
+                # Missing user_email field
+            }
+        }
+        
+        result = resolve_calendar_owner(self.sample_parsed_email)
+        
+        self.assertEqual(result["status"], "user_email_missing")
+        self.assertIn("user_email field missing", result["reason"])
+    
+    @patch('booking_agent.calendar_owner_resolver._list_booking_emails')
+    @patch('booking_agent.calendar_owner_resolver._lookup_user_records')
     @patch('booking_agent.calendar_owner_resolver._disambiguate_owner_with_llm')
     def test_resolve_calendar_owner_multiple_valid_owners_llm_success(self, mock_llm, mock_lookup, mock_list):
         """Test when multiple valid owners exist and LLM successfully chooses one."""
         mock_list.return_value = ["booking1@bhaang.com", "booking2@bhaang.com"]
         mock_lookup.return_value = {
-            "booking1@bhaang.com": {"user_id": "user1", "assist_email": "booking1@bhaang.com"},
-            "booking2@bhaang.com": {"user_id": "user2", "assist_email": "booking2@bhaang.com"}
+            "booking1@bhaang.com": {
+                "user_id": "user1", 
+                "assist_email": "booking1@bhaang.com",
+                "user_email": "sender@example.com"  # In conversation (from sample_parsed_email)
+            },
+            "booking2@bhaang.com": {
+                "user_id": "user2", 
+                "assist_email": "booking2@bhaang.com",
+                "user_email": "other@example.com"  # In conversation (from sample_parsed_email)
+            }
         }
         mock_llm.return_value = "booking1@bhaang.com"
         
@@ -214,14 +264,22 @@ class TestCalendarOwnerResolver(unittest.TestCase):
         """Test when multiple valid owners exist but LLM cannot choose."""
         mock_list.return_value = ["booking1@bhaang.com", "booking2@bhaang.com"]
         mock_lookup.return_value = {
-            "booking1@bhaang.com": {"user_id": "user1", "assist_email": "booking1@bhaang.com"},
-            "booking2@bhaang.com": {"user_id": "user2", "assist_email": "booking2@bhaang.com"}
+            "booking1@bhaang.com": {
+                "user_id": "user1", 
+                "assist_email": "booking1@bhaang.com",
+                "user_email": "sender@example.com"  # In conversation (from sample_parsed_email)
+            },
+            "booking2@bhaang.com": {
+                "user_id": "user2", 
+                "assist_email": "booking2@bhaang.com",
+                "user_email": "other@example.com"  # In conversation (from sample_parsed_email)
+            }
         }
         mock_llm.return_value = None
         
         result = resolve_calendar_owner(self.sample_parsed_email)
         
-        self.assertEqual(result["status"], "multiple_not_sure")
+        self.assertEqual(result["status"], "multiple_owners_ambiguous")
         self.assertEqual(result["candidates"], ["booking1@bhaang.com", "booking2@bhaang.com"])
         self.assertIn("LLM could not confidently choose", result["reason"])
     
@@ -233,14 +291,22 @@ class TestCalendarOwnerResolver(unittest.TestCase):
         mock_list.return_value = ["booking1@bhaang.com", "booking2@bhaang.com", "booking3@bhaang.com"]
         # But only two have valid owners
         mock_lookup.return_value = {
-            "booking1@bhaang.com": {"user_id": "user1", "assist_email": "booking1@bhaang.com"},
-            "booking2@bhaang.com": {"user_id": "user2", "assist_email": "booking2@bhaang.com"}
+            "booking1@bhaang.com": {
+                "user_id": "user1", 
+                "assist_email": "booking1@bhaang.com",
+                "user_email": "sender@example.com"  # In conversation (from sample_parsed_email)
+            },
+            "booking2@bhaang.com": {
+                "user_id": "user2", 
+                "assist_email": "booking2@bhaang.com",
+                "user_email": "other@example.com"  # In conversation (from sample_parsed_email)
+            }
         }
         
         result = resolve_calendar_owner(self.sample_parsed_email)
         
         # Should proceed with only the valid emails
-        self.assertEqual(result["status"], "multiple_not_sure")
+        self.assertEqual(result["status"], "multiple_owners_ambiguous")
         self.assertEqual(result["candidates"], ["booking1@bhaang.com", "booking2@bhaang.com"])
     
     @patch('booking_agent.calendar_owner_resolver._list_booking_emails')
@@ -252,8 +318,37 @@ class TestCalendarOwnerResolver(unittest.TestCase):
         
         result = resolve_calendar_owner(self.sample_parsed_email)
         
-        self.assertEqual(result["status"], "no_mapping")
+        self.assertEqual(result["status"], "booking_agent_not_registered")
         self.assertIn("No valid calendar owners found", result["reason"])
+    
+    @patch('booking_agent.calendar_owner_resolver._list_booking_emails')
+    @patch('booking_agent.calendar_owner_resolver._lookup_user_records')
+    def test_resolve_calendar_owner_mixed_validity_and_conversation(self, mock_lookup, mock_list):
+        """Test complex scenario with mixed validity and conversation presence."""
+        mock_list.return_value = ["booking1@bhaang.com", "booking2@bhaang.com", "booking3@bhaang.com"]
+        mock_lookup.return_value = {
+            "booking1@bhaang.com": {
+                "user_id": "user1", 
+                "assist_email": "booking1@bhaang.com",
+                "user_email": "sender@example.com"  # In conversation (from sample_parsed_email)
+            },
+            "booking2@bhaang.com": {
+                "user_id": "user2", 
+                "assist_email": "booking2@bhaang.com",
+                "user_email": "alice@example.com"  # NOT in conversation
+            },
+            "booking3@bhaang.com": {
+                "user_id": "user3", 
+                "assist_email": "booking3@bhaang.com"
+                # Missing user_email
+            }
+        }
+        
+        result = resolve_calendar_owner(self.sample_parsed_email)
+        
+        # Should return user_email_missing due to booking3
+        self.assertEqual(result["status"], "user_email_missing")
+        self.assertIn("user_email field missing", result["reason"])
 
 
 if __name__ == '__main__':

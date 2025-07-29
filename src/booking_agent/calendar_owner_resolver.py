@@ -64,6 +64,19 @@ def _lookup_user_records(agent_emails: List[str]) -> Dict[str, Dict[str, Any]]:
     return results
 
 
+def _is_user_in_conversation(user_email: str, parsed_email: Dict[str, Any]) -> bool:
+    """Check if the actual user email is present in the conversation (case-insensitive)."""
+    if not user_email:
+        return False
+    
+    # Get all emails from the conversation
+    all_fields = parsed_email.get("from", []) + parsed_email.get("to", []) + parsed_email.get("cc", [])
+    conversation_emails = {_extract_clean_email(a).lower() for a in all_fields}
+    
+    # Check if user email is in conversation (case-insensitive)
+    return user_email.lower() in conversation_emails
+
+
 def _disambiguate_owner_with_llm(parsed_email: Dict[str, Any], candidate_emails: List[str]) -> Optional[str]:
     """Use LLM to pick correct booking agent when >1 mapping found.
     Returns chosen booking-agent email or None if not confident."""
@@ -106,29 +119,32 @@ def _disambiguate_owner_with_llm(parsed_email: Dict[str, Any], candidate_emails:
 
 def resolve_calendar_owner(parsed_email: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Determine which user's calendar to use with improved logic.
+    Determine which user's calendar to use with security checks.
     
     Logic:
     1. Find all booking agent emails in the conversation
     2. Look up user records for those emails
-    3. Filter out emails that don't have valid owners (drop them)
-    4. If no valid owners remain -> return no_mapping
-    5. If exactly one valid owner -> return success
-    6. If multiple valid owners -> use LLM to disambiguate
+    3. Filter out emails that don't have valid owners
+    4. For each valid owner, check if the actual user email is in the conversation
+    5. If no valid owners remain -> return booking_agent_not_registered
+    6. If no owners are in conversation -> return calendar_owner_not_in_conversation
+    7. If exactly one valid owner in conversation -> return success
+    8. If multiple valid owners in conversation -> use LLM to disambiguate
     
     Returns:
         Dict with status and data:
-        - status: "success", "no_mapping", "multiple_not_sure"
+        - status: "success", "no_booking_agents_found", "booking_agent_not_registered", 
+                 "calendar_owner_not_in_conversation", "user_email_missing", "multiple_owners_ambiguous"
         - user_id: (if success) the user ID
         - assist_email: (if success) the booking agent email
-        - candidates: (if multiple_not_sure) list of candidate emails
+        - candidates: (if multiple_owners_ambiguous) list of candidate emails
     """
     # Step 1: Find all booking agent emails in the conversation
     agent_emails = _list_booking_emails(parsed_email)
     logger.debug(f"Booking agent emails in thread: {agent_emails}")
     
     if not agent_emails:
-        return {"status": "no_mapping", "reason": "No booking agent emails found in conversation"}
+        return {"status": "no_booking_agents_found", "reason": "No booking agent emails found in conversation"}
     
     # Step 2: Look up user records for those emails
     records = _lookup_user_records(agent_emails)
@@ -143,11 +159,43 @@ def resolve_calendar_owner(parsed_email: Dict[str, Any]) -> Dict[str, Any]:
     
     # Step 4: If no valid owners remain
     if not valid_emails:
-        return {"status": "no_mapping", "reason": "No valid calendar owners found for booking agent emails"}
+        return {"status": "booking_agent_not_registered", "reason": "No valid calendar owners found for booking agent emails"}
     
-    # Step 5: If exactly one valid owner
-    if len(valid_emails) == 1:
-        email = valid_emails[0]
+    # Step 5: Check if actual users are in conversation and handle missing user_email
+    owners_in_conversation = []
+    missing_user_emails = []
+    
+    for email in valid_emails:
+        item = records[email]
+        user_email = item.get("user_email")
+        
+        if not user_email:
+            missing_user_emails.append(email)
+            logger.warning(f"Missing user_email for booking agent: {email}")
+            continue
+        
+        if _is_user_in_conversation(user_email, parsed_email):
+            owners_in_conversation.append(email)
+        else:
+            logger.info(f"User {user_email} not in conversation for booking agent: {email}")
+    
+    # Step 6: Handle missing user_email cases
+    if missing_user_emails:
+        return {
+            "status": "user_email_missing", 
+            "reason": f"Booking agents found but user_email field missing: {missing_user_emails}"
+        }
+    
+    # Step 7: If no owners are in conversation
+    if not owners_in_conversation:
+        return {
+            "status": "calendar_owner_not_in_conversation", 
+            "reason": "Booking agents found but actual calendar owners not in conversation"
+        }
+    
+    # Step 8: If exactly one valid owner in conversation
+    if len(owners_in_conversation) == 1:
+        email = owners_in_conversation[0]
         item = records[email]
         return {
             "status": "success", 
@@ -155,9 +203,9 @@ def resolve_calendar_owner(parsed_email: Dict[str, Any]) -> Dict[str, Any]:
             "assist_email": email
         }
     
-    # Step 6: If multiple valid owners -> use LLM to disambiguate
-    logger.info(f"Multiple valid owners found: {valid_emails}, using LLM to disambiguate")
-    chosen = _disambiguate_owner_with_llm(parsed_email, valid_emails)
+    # Step 9: If multiple valid owners in conversation -> use LLM to disambiguate
+    logger.info(f"Multiple valid owners in conversation: {owners_in_conversation}, using LLM to disambiguate")
+    chosen = _disambiguate_owner_with_llm(parsed_email, owners_in_conversation)
     
     if chosen and chosen in records:
         return {
@@ -167,7 +215,7 @@ def resolve_calendar_owner(parsed_email: Dict[str, Any]) -> Dict[str, Any]:
         }
     
     return {
-        "status": "multiple_not_sure", 
-        "candidates": valid_emails,
-        "reason": "LLM could not confidently choose between multiple valid owners"
+        "status": "multiple_owners_ambiguous", 
+        "candidates": owners_in_conversation,
+        "reason": "LLM could not confidently choose between multiple valid owners in conversation"
     } 
