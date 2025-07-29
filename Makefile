@@ -133,6 +133,10 @@ test-real-email: ## Test booking agent with real S3 email
 	@echo "Testing booking agent with real S3 email..."
 	cd src && python -c "from test_booking_agent import test_real_s3_email; test_real_s3_email()"
 
+test-calendar-owner-resolver: ## Test calendar owner resolution logic
+	@echo "Testing calendar owner resolution logic..."
+	cd src && python -m booking_agent.test_calendar_owner_resolver
+
 # User Email API tests
 
 test-get-user-email: ## Test GET /user/email endpoint

@@ -4,7 +4,8 @@ import os
 import logging
 
 # Global variables
-STAGE = os.environ['STAGE']
+STAGE = os.getenv('STAGE')
+print(f"STAGE: {STAGE}")
 secrets_client = boto3.client('secretsmanager')
 response = secrets_client.get_secret_value(SecretId=f"{STAGE}/vibecal")
 _secrets = json.loads(response['SecretString'])
