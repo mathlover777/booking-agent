@@ -305,7 +305,7 @@ def test_case_4_cancel_event() -> str:
     meeting_date = (datetime.now() + timedelta(days=4)).strftime("%Y-%m-%d")
     start_time = "14:00"
     end_time = "15:00"
-    title = f"AI-Cancel-Seed {uuid.uuid4().hex[:4]}"
+    title = f"AI-Cancel-Test {uuid.uuid4().hex[:4]}"
 
     calendar_assistant = CalendarAssistant(TEST_USER_ID)
     seed_event = calendar_assistant.book_event(
@@ -313,10 +313,28 @@ def test_case_4_cancel_event() -> str:
         start_time=start_time,
         end_time=end_time,
         title=title,
-        attendees=["dummy@example.com"],
+        attendees=["lisa.chen@techcorp.com", TEST_USER_EMAIL],
     )
     event_id = seed_event["event_id"]
     print(f"Seeded calendar with event {event_id} to be cancelled.")
+
+    print(f"\n{'='*60}")
+    print("🧪 TEST CASE 4: Cancel Event")
+    print(f"{'='*60}")
+    print(f"📅 Meeting date: {meeting_date}")
+    print(f"⏰ Time: {start_time}-{end_time}")
+    print(f"📝 Title: {title}")
+    print(f"🆔 Event ID: {event_id}")
+    print(f"👤 User: {TEST_USER_EMAIL}")
+    print(f"🤖 Agent: {BOOKING_EMAIL}")
+    print(f"📧 From: Lisa Chen (wanting to cancel)")
+    print(f"\n📋 EXPECTED BEHAVIOR:")
+    print(f"   • Agent should recognize Lisa's request to cancel the meeting")
+    print(f"   • Agent should cancel calendar event with ID: {event_id}")
+    print(f"   • Response should confirm cancellation was successful")
+    print(f"   • Response should end with 'By VibeCal'")
+    print(f"   • Event should no longer exist in Google Calendar")
+    print(f"{'='*60}")
 
     # Compose e-mail asking the agent to cancel the event
     body = (
@@ -327,13 +345,48 @@ def test_case_4_cancel_event() -> str:
         f"> the current booking? I'll reach out again to find a new time.\n>\n"
         f"> Thanks,\n"
         f"> Lisa\n>\n"
-        f"> On Wed, 9 Jul 2025 at 15:00, {TEST_USER_EMAIL} wrote:\n"
+        f"> On Wed, 9 Jul 2025 at 15:00, {BOOKING_EMAIL} wrote:\n"
         f">> Hi Lisa,\n>>\n"
-        f">> No problem, I'll cancel the meeting for you.\n>>\n"
+        f">> I've successfully booked your meeting for {meeting_date} at {start_time}-{end_time}.\n"
+        f">> Event ID: {event_id}\n>>\n"
+        f">> Looking forward to our discussion!\n>>\n"
+        f">> By VibeCal\n>\n"
+        f"> On Wed, 9 Jul 2025 at 14:20, Lisa Chen <lisa.chen@techcorp.com> wrote:\n"
+        f">> Hi Sourav,\n>>\n"
+        f">> Perfect! I'd like to book the {start_time} slot on {meeting_date} for '{title}'.\n"
+        f">> Please go ahead and schedule it.\n>>\n"
+        f">> Thanks,\n"
+        f">> Lisa\n>\n"
+        f"> On Wed, 9 Jul 2025 at 13:45, {BOOKING_EMAIL} wrote:\n"
+        f">> Hi Lisa,\n>>\n"
+        f">> Here are Sourav's available slots for {meeting_date}:\n>>\n"
+        f">> - {meeting_date} 09:00-10:00\n"
+        f">> - {meeting_date} 10:00-11:00\n"
+        f">> - {meeting_date} 14:00-15:00\n"
+        f">> - {meeting_date} 16:00-17:00\n>>\n"
+        f">> Let me know which time works best for you!\n>>\n"
+        f">> By VibeCal\n>\n"
+        f"> On Wed, 9 Jul 2025 at 12:30, Lisa Chen <lisa.chen@techcorp.com> wrote:\n"
+        f">> Hi Sourav,\n>>\n"
+        f">> I'd like to schedule a meeting with you. Could you please share your\n"
+        f">> availability for {meeting_date}?\n>>\n"
         f">> Best regards,\n"
+        f">> Lisa\n>\n"
+        f"> On Wed, 9 Jul 2025 at 12:15, {TEST_USER_EMAIL} wrote:\n"
+        f">> Hi Lisa,\n>>\n"
+        f">> I'll have my assistant check my calendar and share my availability.\n>>\n"
+        f">> Thanks,\n"
         f">> Sourav"
     )
-    parsed_email = _base_parsed_email("Re: Meeting cancellation", body)
+    # In this case, Lisa is asking to cancel a slot, so the email is from Lisa to Sourav and his agent
+    parsed_email = _base_parsed_email(
+        "Re: Meeting cancellation", 
+        body,
+        to=[TEST_USER_EMAIL, BOOKING_EMAIL],  # Lisa is emailing both Sourav and his agent
+        cc=[]
+    )
+    # Override the from field since Lisa is the sender, not Sourav
+    parsed_email["from"] = ["lisa.chen@techcorp.com"]
 
     response = run_booking_agent(
         parsed_email=parsed_email,
@@ -341,17 +394,32 @@ def test_case_4_cancel_event() -> str:
         booking_email=BOOKING_EMAIL,
     )
 
-    print("\n📧 Agent response (cancel):\n", response)
+    print(f"\n📧 ACTUAL AGENT RESPONSE:")
+    print(f"{'─'*60}")
+    print(response)
+    print(f"{'─'*60}")
+    print(f"\n📋 EXPECTED RESPONSE FORMAT:")
+    print(f"   • Should confirm cancellation was successful")
+    print(f"   • Should mention the event ID: {event_id}")
+    print(f"   • Should end with 'By VibeCal'")
+    print(f"   • Should be professional and understanding tone")
+    print(f"\n⏰ EXPECTED CANCELLATION: Event ID {event_id} should be cancelled")
+    print(f"📅 MANUAL VERIFICATION: Check Google Calendar for date {meeting_date}")
+    print(f"   • Look for event: '{title}'")
+    print(f"   • Event ID: {event_id}")
+    print(f"   • Expected status: 'cancelled' (not deleted)")
 
-    # After agent cancels, attempting to cancel again should 404 – we treat that
-    # as confirmation the event is gone.
+    # After agent cancels, verify the event exists but is cancelled
     try:
-        calendar_assistant.cancel_event(event_id)
-        # If we get here the event still existed – failure
-        raise AssertionError("Event still exists after agent cancellation")
+        event_data = calendar_assistant.get_event(event_id)
+        # Check if the event status is 'cancelled'
+        assert event_data.get('status') == 'cancelled', f"Event not cancelled, status: {event_data.get('status')}"
+        print(f"✅ VERIFICATION: Event {event_id} successfully cancelled (status: cancelled)")
     except Exception as exc:
-        # Expecting "not found" message inside the exception text
-        assert "not found" in str(exc).lower() or "404" in str(exc).lower()
+        if "not found" in str(exc).lower():
+            print(f"✅ VERIFICATION: Event {event_id} completely removed from calendar")
+        else:
+            raise exc
 
     return event_id
 

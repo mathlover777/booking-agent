@@ -1,5 +1,5 @@
 from typing import List, Optional, Dict, Any
-from .calendar_util import get_availability_low_level, book_event_low_level, cancel_event_low_level
+from .calendar_util import get_availability_low_level, book_event_low_level, cancel_event_low_level, get_event_low_level
 
 
 class CalendarAssistant:
@@ -36,6 +36,9 @@ class CalendarAssistant:
 
     def cancel_event(self, event_id: str, notify_attendees: bool = True):
         return cancel_event_low_level(self.user_id, event_id, notify_attendees)
+
+    def get_event(self, event_id: str):
+        return get_event_low_level(self.user_id, event_id)
 
 
 def build_calendar_tools() -> List[Dict[str, Any]]:

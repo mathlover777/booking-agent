@@ -397,3 +397,69 @@ def cancel_event_low_level(user_id: str, event_id: str, notify_attendees: bool =
         print(f"❌ [DEBUG] General error cancelling event {event_id} for user {user_id}: {e}")
         logger.error(f"Error cancelling event {event_id} for user {user_id}: {e}")
         raise Exception(f"Failed to cancel event: {str(e)}") 
+
+
+def get_event_low_level(user_id: str, event_id: str) -> Dict[str, Any]:
+    """
+    Get a specific event from the user's Google Calendar by ID.
+    
+    Args:
+        user_id: User identifier
+        event_id: Google Calendar event ID
+    
+    Returns:
+        Dict containing event details or raises Exception if not found
+    """
+    print(f"🔍 [DEBUG] get_event_low_level called with user_id: {user_id}, event_id: {event_id}")
+    try:
+        # Get OAuth token internally
+        print(f"🔍 [DEBUG] Getting OAuth token for user: {user_id}")
+        oauth_token = get_google_oauth_token_low_level(user_id)
+        if not oauth_token:
+            print(f"🔍 [DEBUG] Could not retrieve Google OAuth token for user: {user_id}")
+            raise Exception("Could not retrieve Google OAuth token for user")
+        
+        events_url = f"{GOOGLE_CALENDAR_API_BASE}/calendars/primary/events/{event_id}"
+        headers = {'Authorization': f'Bearer {oauth_token}'}
+        
+        print(f"🔍 [DEBUG] Making GET request to: {events_url}")
+        response = requests.get(events_url, headers=headers, timeout=30)
+        print(f"🔍 [DEBUG] GET response status: {response.status_code}")
+        
+        if response.status_code == 404:
+            print(f"🔍 [DEBUG] Event with ID {event_id} not found")
+            raise Exception(f"Event with ID {event_id} not found")
+        
+        response.raise_for_status()
+        
+        event_data = response.json()
+        print(f"🔍 [DEBUG] Retrieved event data: {event_data}")
+        
+        result = {
+            'event_id': event_data.get('id'),
+            'title': event_data.get('summary'),
+            'start': event_data.get('start', {}).get('dateTime'),
+            'end': event_data.get('end', {}).get('dateTime'),
+            'description': event_data.get('description'),
+            'location': event_data.get('location'),
+            'attendees': [attendee.get('email') for attendee in event_data.get('attendees', [])],
+            'html_link': event_data.get('htmlLink'),
+            'status': event_data.get('status'),
+            'timezone': event_data.get('start', {}).get('timeZone') if event_data.get('start') else None
+        }
+        
+        print(f"🔍 [DEBUG] Returning event result: {result}")
+        return result
+        
+    except requests.exceptions.HTTPError as e:
+        print(f"🔍 [DEBUG] HTTP error getting event {event_id} for user {user_id}: {e}")
+        if e.response.status_code == 404:
+            print(f"🔍 [DEBUG] Event with ID {event_id} not found")
+            raise Exception(f"Event with ID {event_id} not found")
+        else:
+            logger.error(f"Error getting event {event_id} for user {user_id}: {e}")
+            raise Exception(f"Failed to get event: {str(e)}")
+    except Exception as e:
+        print(f"🔍 [DEBUG] General error getting event {event_id} for user {user_id}: {e}")
+        logger.error(f"Error getting event {event_id} for user {user_id}: {e}")
+        raise Exception(f"Failed to get event: {str(e)}") 
