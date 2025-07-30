@@ -33,26 +33,12 @@ from calendar_utils.calendar_tools import CalendarAssistant, build_calendar_tool
 # Simplified system prompt (calendar owner already resolved)
 # -----------------------------------------------------------------------------
 
-
-def get_booking_agent_system_prompt():
-    booking_email = os.getenv("BOOKING_EMAIL", "book@bhaang.com")
-    today_date = datetime.now().strftime("%Y-%m-%d")
-
-    return f"""
-SYSTEM:
-You are a calendar assistant processing parsed email data. Today's date is {today_date}.
-
-You represent the booking agent address {booking_email}. The calendar owner has already been determined; you do NOT need to figure out whose calendar to use.
-
-Your goals:
-1. Analyze the parsed email data (subject, sender, recipients, body) and understand the user's intent.
-2. When asked for availability → immediately call get_availability showing 5-6 available 1-hour slots (always include timezone).
-3. When the user explicitly confirms a specific slot → call book_event. Always include ALL human emails from the thread (from + to + cc minus {booking_email}) as attendees.
-4. When cancelling → call cancel_event with the provided event_id.
-5. Never proactively book or cancel without explicit confirmation.
-6. After tool calls, reply with a human-readable email starting with "TO: [email]" line indicating greeting recipient, and end with "By VibeCal".
-7. When booking succeeds, include "Event ID: [id]" and calendar link.
-"""
+# Import helper functions from agent_executor module
+from .agent_executor import (
+    get_booking_agent_system_prompt,
+    prepare_email_data_for_ai,
+    run_ai_agent_loop,
+)
 
 
 def send_ai_response_to_thread(parsed_email: dict, ai_response_content: str) -> dict:
@@ -179,74 +165,7 @@ def get_all_email_addresses_from_thread(parsed_email: dict) -> List[str]:
 # Generic AI agent loop function
 # -----------------------------------------------------------------------------
 
-def run_ai_agent_loop(
-    client: OpenAI,
-    system_prompt: str,
-    user_message: str,
-    tools: List[Dict[str, Any]],
-    tool_executor: callable,
-    max_iterations: int = 10
-) -> str:
-    """
-    Generic AI agent loop that can be used with any tool set and executor.
-    
-    Args:
-        client: OpenAI client instance
-        system_prompt: System prompt for the AI
-        user_message: Initial user message
-        tools: List of tool definitions
-        tool_executor: Function that executes tools (tool_name, tool_args) -> result
-        max_iterations: Maximum number of AI iterations
-    
-    Returns:
-        Final AI response content
-    """
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_message},
-    ]
-
-    for iteration in range(max_iterations):
-        print(f"🤖 [DEBUG] AI iteration {iteration + 1}")
-
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=messages,
-            tools=tools,
-            tool_choice="auto",
-        )
-
-        assistant_message = response.choices[0].message
-        messages.append(assistant_message)
-
-        if assistant_message.tool_calls:
-            for tool_call in assistant_message.tool_calls:
-                tool_name = tool_call.function.name
-                tool_args = json.loads(tool_call.function.arguments)
-
-                try:
-                    result = tool_executor(tool_name, tool_args)
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": json.dumps(result),
-                    })
-                except Exception as e:
-                    error_result = {"error": str(e)}
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": json.dumps(error_result),
-                    })
-            continue  # let AI use tool results
-        else:
-            break  # final answer obtained
-
-    return messages[-1].content
-
-
-
-
+# This function has been moved to agent_executor.py
 
 # -----------------------------------------------------------------------------
 # Email processing helper functions
@@ -269,30 +188,6 @@ def load_email_from_s3(s3_bucket: str, s3_key: str) -> str:
     email_content = response['Body'].read().decode('utf-8')
     print(f"📧 [DEBUG] Retrieved email content, length: {len(email_content)} characters")
     return email_content
-
-
-def prepare_email_data_for_ai(parsed_email: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Prepare structured email data for AI processing.
-    
-    Args:
-        parsed_email: Parsed email data
-    
-    Returns:
-        Structured data for AI
-    """
-    return {
-        'subject': parsed_email.get('subject', ''),
-        'from': parsed_email.get('from', []),
-        'to': parsed_email.get('to', []),
-        'cc': parsed_email.get('cc', []),
-        'body': parsed_email.get('body', ''),
-        'date': parsed_email.get('date', ''),
-        'message_id': parsed_email.get('message_id', ''),
-        'in_reply_to': parsed_email.get('in_reply_to', ''),
-        'references': parsed_email.get('references', ''),
-        'return_path': parsed_email.get('return_path', '')
-    }
 
 
 def handle_calendar_owner_resolution(parsed_email: Dict[str, Any]) -> Dict[str, Any]:
