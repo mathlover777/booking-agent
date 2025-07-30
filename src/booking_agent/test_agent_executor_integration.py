@@ -22,8 +22,13 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 load_dotenv("../.env.base", override=True)
 load_dotenv("../.env.dev", override=True)
 
+# Persistent test user - DO NOT DELETE, this is used in production
+TEST_USER_ID = "user_2zTBVQZOK5QCyxL43QTVOHOw3zK"
+TEST_USER_EMAIL = "souravsarkar1729@gmail.com"
+TEST_AGENT_EMAIL = "test.dev@bhaang.com"  # Development agent email
+
 # The booking-agent e-mail we are testing with.
-BOOKING_EMAIL = "book1729.dev@bhaang.com"
+BOOKING_EMAIL = TEST_AGENT_EMAIL  # Use the persistent agent email
 # No need to set environment variable - booking_email is passed as parameter
 
 # Clerk / Google tokens & other secrets are expected to be present in the
@@ -34,10 +39,6 @@ os.environ.setdefault("USER_EMAILS_TABLE_NAME", "vibes-user-emails-dev")
 
 from booking_agent.agent_executor import run_booking_agent
 from calendar_utils.calendar_tools import CalendarAssistant
-
-# Persistent test user supplied by the user
-TEST_USER_ID = "user_2zTBVQZOK5QCyxL43QTVOHOw3zK"
-TEST_USER_EMAIL = "souravsarkar1729@gmail.com"
 
 # ---------------------------------------------------------------------------
 # Helper utilities ----------------------------------------------------------

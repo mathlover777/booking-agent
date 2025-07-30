@@ -10,6 +10,7 @@ include makefiles/testing/core.mk
 include makefiles/testing/calendar-tests.mk
 include makefiles/testing/api-tests.mk
 include makefiles/testing/agent-executor-tests.mk
+include makefiles/testing/agent-tests.mk
 
 # Default target
 .DEFAULT_GOAL := help 

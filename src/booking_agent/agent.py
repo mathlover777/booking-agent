@@ -1,14 +1,9 @@
-import os
-import json
-import boto3
-from openai import OpenAI
-from typing import List, Optional, Dict, Any
-from datetime import datetime
-from email_util import parse_email_from_s3, send_email_via_ses
-import re
 import logging
+from typing import Dict, Any
 
 from common_utils import aws_utils
+from .calendar_owner_resolver import resolve_calendar_owner
+from .agent_executor import run_booking_agent
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -16,295 +11,110 @@ logger = logging.getLogger(__name__)
 # Get secrets
 _secrets = aws_utils._secrets
 
-# -----------------------------------------------------------------------------
-# Calendar owner resolution (imported from separate module)
-# -----------------------------------------------------------------------------
 
-from .calendar_owner_resolver import resolve_calendar_owner, _extract_clean_email
-
-
-# -----------------------------------------------------------------------------
-# Calendar tools and assistant (imported from calendar package)
-# -----------------------------------------------------------------------------
-
-from calendar_utils.calendar_tools import CalendarAssistant, build_calendar_tools, calendar_tool_executor
-
-# -----------------------------------------------------------------------------
-# Simplified system prompt (calendar owner already resolved)
-# -----------------------------------------------------------------------------
-
-# Import helper functions from agent_executor module
-from .agent_executor import (
-    get_booking_agent_system_prompt,
-    prepare_email_data_for_ai,
-    run_ai_agent_loop,
-)
-
-
-def send_ai_response_to_thread(parsed_email: dict, ai_response_content: str) -> dict:
+def process_booking_request(parsed_email: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Send the AI response to all participants in the email thread (reply all).
+    Process a booking request from parsed email data.
+    
+    Assumption: Email is NEVER from the booking agent email, some human made the email.
+    We will try to disambiguate which calendar owner to use.
     
     Args:
         parsed_email: Parsed email data from parse_email_from_s3
-        ai_response_content: The AI-generated response content to send
     
     Returns:
-        Dict with send result
+        Dict with processing result:
+        - action: "processed", "clarification_needed", "error"
+        - ai_response: (if processed) the AI response content
+        - clarification_message: (if clarification_needed) message to send
+        - status: (if clarification_needed) resolution status
+        - reason: (if clarification_needed) reason for failure
+        - calendar_user_id: (if processed) the resolved user ID
+        - booking_email: (if processed) the booking agent email
     """
-    import re
-    import os
+    logger.info("Processing booking request")
+    logger.info(f"Parsed email with keys: {list(parsed_email.keys())}")
     
-    booking_email = os.getenv('BOOKING_EMAIL', 'book@bhaang.com')
+    # Resolve calendar owner
+    logger.info("Resolving calendar owner")
+    owner_resolution = resolve_calendar_owner(parsed_email)
+    logger.info(f"Owner resolution status: {owner_resolution.get('status')}")
     
-    # Parse the "TO:" line from AI response to determine greeting recipient
-    lines = ai_response_content.strip().split('\n')
-    greeting_recipient = None
-    cleaned_response_content = ai_response_content
-    
-    # Look for "TO: [email]" at the beginning of the response
-    if lines and lines[0].strip().upper().startswith('TO:'):
-        to_line = lines[0].strip()
-        email_match = re.search(r'TO:\s*([^\s]+@[^\s]+)', to_line, re.IGNORECASE)
-        if email_match:
-            greeting_recipient = email_match.group(1)
-            # Remove the TO: line from the response content
-            cleaned_response_content = '\n'.join(lines[1:]).strip()
-            print(f"🎯 AI specified greeting recipient: {greeting_recipient}")
-    
-    # Get all participants from the email thread
-    all_participants = []
-    
-    # Add sender (from field)
-    from_addresses = parsed_email.get('from', [])
-    for email_addr in from_addresses:
-        clean_email = _extract_clean_email(email_addr)
-        if clean_email and clean_email.lower() != booking_email.lower():
-            all_participants.append(clean_email)
-    
-    # Add all recipients (to + cc) except booking email
-    to_addresses = parsed_email.get('to', [])
-    cc_addresses = parsed_email.get('cc', [])
-    
-    for email_addr in to_addresses + cc_addresses:
-        clean_email = _extract_clean_email(email_addr)
-        if (clean_email and 
-            clean_email.lower() != booking_email.lower() and 
-            clean_email not in all_participants):
-            all_participants.append(clean_email)
-    
-    if not all_participants:
+    # Handle unsuccessful resolution
+    if owner_resolution.get("status") != "success":
+        status = owner_resolution.get("status")
+        reason = owner_resolution.get("reason", "Unknown error")
+        
+        logger.warning(f"Calendar owner resolution failed: {status} - {reason}")
+        
+        # Create clarification message based on status
+        if status == "no_booking_agents_found":
+            message = (
+                "Hello,\n\n"
+                "I couldn't find any booking agent addresses in this conversation. "
+                "Please make sure to include a booking agent email address.\n\n"
+                "By VibeCal"
+            )
+        elif status == "booking_agent_not_registered":
+            message = (
+                "Hello,\n\n"
+                "I found booking agent addresses but they're not properly configured. "
+                "Please set up your booking agent first.\n\n"
+                "By VibeCal"
+            )
+        elif status == "calendar_owner_not_in_conversation":
+            message = (
+                "Hello,\n\n"
+                "I found booking agents but the actual calendar owner is not in this conversation. "
+                "Please make sure the calendar owner is included in the email thread.\n\n"
+                "By VibeCal"
+            )
+        elif status == "user_email_missing":
+            message = (
+                "Hello,\n\n"
+                "I found booking agents but they're missing user email configuration. "
+                "Please contact support to fix this.\n\n"
+                "By VibeCal"
+            )
+        elif status == "multiple_owners_ambiguous":
+            candidates = ", ".join(owner_resolution.get("candidates", []))
+            message = (
+                f"Hello,\n\n"
+                f"I found multiple booking agents in this conversation ({candidates}) "
+                f"and I'm not sure which calendar to use. Please clarify which one I should reference.\n\n"
+                f"By VibeCal"
+            )
+        else:
+            message = (
+                "Hello,\n\n"
+                "I encountered an issue processing your request. Please try again or contact support.\n\n"
+                "By VibeCal"
+            )
+        
         return {
-            'success': False,
-            'error': 'No valid recipients found (all participants are booking email)'
+            "action": "clarification_needed",
+            "clarification_message": message,
+            "status": status,
+            "reason": reason
         }
     
-    # Get threading information
-    message_id = parsed_email.get('message_id', '')
-    references = parsed_email.get('references', '')
+    # Success - run the booking agent
+    logger.info(f"Calendar owner resolved: {owner_resolution['user_id']}")
+    calendar_user_id = owner_resolution["user_id"]
+    booking_email = owner_resolution["assist_email"]
     
-    # If this is a reply, add the current message ID to references
-    if message_id and references:
-        references = f"{references} {message_id}"
-    elif message_id:
-        references = message_id
-    
-    # Determine subject (add Re: if not already present)
-    subject = parsed_email.get('subject', '')
-    if not subject.lower().startswith('re:'):
-        subject = f"Re: {subject}"
-    
-    print(f"📧 Sending AI response to {len(all_participants)} participants:")
-    for participant in all_participants:
-        print(f"  → {participant}")
-    
-    # Send the AI response to all participants
-    return send_email_via_ses(
-        to_addresses=all_participants,
-        subject=subject,
-        body=cleaned_response_content,
-        reply_to_message_id=message_id,
-        reply_to_references=references
+    # Run the booking agent
+    logger.info("Running booking agent")
+    ai_response = run_booking_agent(
+        parsed_email=parsed_email,
+        calendar_user_id=calendar_user_id,
+        booking_email=booking_email
     )
-
-
-def get_all_email_addresses_from_thread(parsed_email: dict) -> List[str]:
-    """
-    Extract all unique email addresses from the email thread.
     
-    Args:
-        parsed_email: Parsed email data from parse_email_from_s3
-    
-    Returns:
-        List of clean email addresses (excluding booking email)
-    """
-    booking_email = os.getenv('BOOKING_EMAIL', 'book@bhaang.com')
-    all_emails = set()
-    
-    # Add sender (from field)
-    from_addresses = parsed_email.get('from', [])
-    for email_addr in from_addresses:
-        clean_email = _extract_clean_email(email_addr)
-        if clean_email and clean_email.lower() != booking_email.lower():
-            all_emails.add(clean_email)
-    
-    # Add all recipients (to + cc) except booking email
-    to_addresses = parsed_email.get('to', [])
-    cc_addresses = parsed_email.get('cc', [])
-    
-    for email_addr in to_addresses + cc_addresses:
-        clean_email = _extract_clean_email(email_addr)
-        if (clean_email and 
-            clean_email.lower() != booking_email.lower()):
-            all_emails.add(clean_email)
-    
-    return list(all_emails)
-
-
-# -----------------------------------------------------------------------------
-# Generic AI agent loop function
-# -----------------------------------------------------------------------------
-
-# This function has been moved to agent_executor.py
-
-# -----------------------------------------------------------------------------
-# Email processing helper functions
-# -----------------------------------------------------------------------------
-
-def load_email_from_s3(s3_bucket: str, s3_key: str) -> str:
-    """
-    Load email content from S3.
-    
-    Args:
-        s3_bucket: S3 bucket name
-        s3_key: S3 object key
-    
-    Returns:
-        Email content as string
-    """
-    print(f"📧 [DEBUG] Getting email content from S3")
-    s3_client = boto3.client('s3')
-    response = s3_client.get_object(Bucket=s3_bucket, Key=s3_key)
-    email_content = response['Body'].read().decode('utf-8')
-    print(f"📧 [DEBUG] Retrieved email content, length: {len(email_content)} characters")
-    return email_content
-
-
-def handle_calendar_owner_resolution(parsed_email: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Handle calendar owner resolution and return appropriate response.
-    
-    Args:
-        parsed_email: Parsed email data
-    
-    Returns:
-        Dict with resolution result or error response
-    """
-    owner_resolution = resolve_calendar_owner(parsed_email)
-    
-    if owner_resolution.get("status") == "no_mapping":
-        error_msg = (
-            "TO: unknown\n"
-            "Hello,\n\n"
-            "I couldn't find a calendar linked to this concierge address. "
-            "Please configure your booking agent.\n\nBy VibeCal"
-        )
-        send_email_via_ses(parsed_email.get("from", []), "Concierge not configured", error_msg)
-        return {"action": "error", "error": "No concierge mapping found"}
-
-    if owner_resolution.get("status") == "multiple_not_sure":
-        candidates = ", ".join(owner_resolution["candidates"])
-        clar_msg = (
-            f"TO: unknown\nHello,\n\nI found multiple booking agents in this conversation ({candidates}) "
-            "and I'm not sure which calendar to use. Please clarify which one I should reference.\n\nBy VibeCal"
-        )
-        send_email_via_ses(parsed_email.get("from", []), "Need clarification", clar_msg)
-        return {"action": "clarification_requested"}
-
-    return {"action": "success", "user_id": owner_resolution["user_id"]}
-
-
-def process_email_with_ai(s3_bucket: str, s3_key: str) -> dict:
-    """
-    Process an email from S3 through the AI agent using parsed email data.
-    
-    Args:
-        s3_bucket: S3 bucket name
-        s3_key: S3 object key
-    
-    Returns:
-        Dict containing AI agent response with structured data
-    """
-    print(f"📧 [DEBUG] process_email_with_ai called with s3_bucket: {s3_bucket}, s3_key: {s3_key}")
-    try:
-        # Load and parse email
-        email_content = load_email_from_s3(s3_bucket, s3_key)
-        parsed_email = parse_email_from_s3(email_content)
-        print(f"📧 [DEBUG] Parsed email keys: {list(parsed_email.keys())}")
-        
-        # Initialize OpenAI client
-        print(f"📧 [DEBUG] Initializing OpenAI client")
-        api_key = _secrets.get('OPENAI_API_KEY')
-        if not api_key:
-            raise ValueError("OPENAI_API_KEY not found in secrets")
-        client = OpenAI(api_key=api_key)
-        
-        # Prepare email data for AI
-        email_data_for_ai = prepare_email_data_for_ai(parsed_email)
-        print(f"📧 [DEBUG] Email data for AI: {json.dumps(email_data_for_ai)}")
-        
-        # Handle calendar owner resolution
-        owner_result = handle_calendar_owner_resolution(parsed_email)
-        if owner_result.get("action") != "success":
-            return owner_result
-
-        calendar_user_id = owner_result["user_id"]
-        cal = CalendarAssistant(calendar_user_id)
-
-        # Run AI agent loop
-        tools = build_calendar_tools()
-        system_prompt = get_booking_agent_system_prompt()
-        user_message = (
-            "PARSED EMAIL DATA:\n" + json.dumps(email_data_for_ai, indent=2) +
-            "\n\nPlease process this parsed email data and respond accordingly."
-        )
-        
-        # Create tool executor bound to this calendar assistant
-        def tool_executor(tool_name: str, tool_args: Dict[str, Any]) -> Dict[str, Any]:
-            return calendar_tool_executor(cal, tool_name, tool_args)
-
-        final_response = run_ai_agent_loop(
-            client=client,
-            system_prompt=system_prompt,
-            user_message=user_message,
-            tools=tools,
-            tool_executor=tool_executor
-        )
-
-        # Send the AI response to all participants
-        send_result = send_ai_response_to_thread(parsed_email, final_response)
-
-        if send_result.get("success"):
-            return {
-                "action": "processed",
-                "email_response": final_response,
-                "send_result": send_result,
-                "parsed_email_data": email_data_for_ai,
-            }
-        else:
-            return {
-                "action": "error",
-                "error": send_result.get("error"),
-                "email_response": final_response,
-                "parsed_email_data": email_data_for_ai,
-            }
-        
-    except Exception as e:
-        print(f"❌ Error processing email with AI: {e}")
-        return {
-            'action': 'error',
-            'error': str(e),
-            'owner_email': None,
-            'email_response': f"Sorry, I encountered an error processing your request: {str(e)}",
-            'email_ids': []
-        } 
+    logger.info("Booking agent completed successfully")
+    return {
+        "action": "processed",
+        "ai_response": ai_response,
+        "calendar_user_id": calendar_user_id,
+        "booking_email": booking_email
+    } 

@@ -1,6 +1,6 @@
 # Vibes CDK Project - Core Testing Targets
 
-.PHONY: test-email test-calendar test-booking-agent test-real-email
+.PHONY: test-email test-calendar test-agent test-agent-calendar-failures
 
 # Email processing test
 test-email: ## Test email processing and auto-reply with default S3 key
@@ -12,11 +12,11 @@ test-calendar: ## Test complete calendar workflow (availability, book, delete)
 	@echo "Testing complete calendar workflow..."
 	cd src && python -m calendar_utils.test_calendar_util
 
-# Booking agent AI tests
-test-booking-agent: ## Test booking agent AI integration
-	@echo "Testing booking agent AI integration..."
-	cd src && python test_booking_agent.py
+# Agent integration tests (replaces old booking agent tests)
+test-agent: ## Test agent integration (all tests)
+	@echo "Testing agent integration (all tests)..."
+	cd src && python -m booking_agent.test_agent_integration
 
-test-real-email: ## Test booking agent with real S3 email
-	@echo "Testing booking agent with real S3 email..."
-	cd src && python -c "from test_booking_agent import test_real_s3_email; test_real_s3_email()" 
+test-agent-calendar-failures: ## Test calendar owner resolution failures (deterministic)
+	@echo "Testing calendar owner resolution failures..."
+	cd src && python -c "from booking_agent.test_agent_integration import test_all_calendar_owner_failures; test_all_calendar_owner_failures()" 
