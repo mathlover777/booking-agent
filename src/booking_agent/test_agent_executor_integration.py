@@ -219,6 +219,7 @@ def test_case_3_book_event() -> str:
     print(f"🤖 Agent: {BOOKING_EMAIL}")
     print(f"📧 From: Mike Johnson (wanting to book)")
     print(f"\n📋 EXPECTED BEHAVIOR:")
+    print(f"   • Agent should recognize Mike's request to book the {start_time} slot")
     print(f"   • Agent should create calendar event for {meeting_date} {start_time}-{end_time}")
     print(f"   • Response should confirm booking was successful")
     print(f"   • Response should include 'Event ID: [some-id]'")
@@ -230,17 +231,40 @@ def test_case_3_book_event() -> str:
         f"@{BOOKING_EMAIL} please book {meeting_date} {start_time}-{end_time} for '{title}'\n\n"
         f"On Tue, 8 Jul 2025 at 14:20, Mike Johnson <mike.johnson@startup.com> wrote:\n"
         f"> Hi Sourav,\n>\n"
-        f"> Thanks for sharing your availability! I'd like to book a meeting for\n"
-        f"> {meeting_date} at {start_time}. Can you please schedule '{title}'?\n>\n"
-        f"> Looking forward to it,\n"
+        f"> Perfect! I'd like to book the {start_time} slot on {meeting_date} for '{title}'.\n"
+        f"> Please go ahead and schedule it.\n>\n"
+        f"> Thanks,\n"
         f"> Mike\n>\n"
-        f"> On Tue, 8 Jul 2025 at 13:45, {TEST_USER_EMAIL} wrote:\n"
+        f"> On Tue, 8 Jul 2025 at 13:45, {BOOKING_EMAIL} wrote:\n"
         f">> Hi Mike,\n>>\n"
-        f">> Here are my available slots for next week...\n>>\n"
-        f">> Best,\n"
+        f">> Here are Sourav's available slots for {meeting_date}:\n>>\n"
+        f">> - {meeting_date} 09:00-10:00\n"
+        f">> - {meeting_date} 10:00-11:00\n"
+        f">> - {meeting_date} 14:00-15:00\n"
+        f">> - {meeting_date} 16:00-17:00\n>>\n"
+        f">> Let me know which time works best for you!\n>>\n"
+        f">> By VibeCal\n>\n"
+        f"> On Tue, 8 Jul 2025 at 12:30, Mike Johnson <mike.johnson@startup.com> wrote:\n"
+        f">> Hi Sourav,\n>>\n"
+        f">> I'd like to schedule a meeting with you. Could you please share your\n"
+        f">> availability for {meeting_date}?\n>>\n"
+        f">> Best regards,\n"
+        f">> Mike\n>\n"
+        f"> On Tue, 8 Jul 2025 at 12:15, {TEST_USER_EMAIL} wrote:\n"
+        f">> Hi Mike,\n>>\n"
+        f">> I'll have my assistant check my calendar and share my availability.\n>>\n"
+        f">> Thanks,\n"
         f">> Sourav"
     )
-    parsed_email = _base_parsed_email("Re: Meeting booking", body)
+    # In this case, Mike is asking to book a slot, so the email is from Mike to Sourav and his agent
+    parsed_email = _base_parsed_email(
+        "Re: Meeting booking", 
+        body,
+        to=[TEST_USER_EMAIL, BOOKING_EMAIL],  # Mike is emailing both Sourav and his agent
+        cc=[]
+    )
+    # Override the from field since Mike is the sender, not Sourav
+    parsed_email["from"] = ["mike.johnson@startup.com"]
 
     response = run_booking_agent(
         parsed_email=parsed_email,
@@ -255,9 +279,10 @@ def test_case_3_book_event() -> str:
     print(f"\n📋 EXPECTED RESPONSE FORMAT:")
     print(f"   • Should confirm booking was successful")
     print(f"   • Should include 'Event ID: [some-id]'")
-    print(f"   • Should mention the meeting details: {title} on {meeting_date}")
+    print(f"   • Should mention the meeting details: {title} on {meeting_date} at {start_time}-{end_time}")
     print(f"   • Should end with 'By VibeCal'")
     print(f"   • Should be professional and confirmatory tone")
+    print(f"\n⏰ EXPECTED BOOKING TIME: {meeting_date} {start_time}-{end_time}")
 
     # Extract event-id from the response – per system-prompt the agent should
     # include a line like "Event ID: abc123" after successful booking.
