@@ -36,11 +36,17 @@ def test_case_1_single_agent_user_in_thread():
     
     # Setup DynamoDB test data
     table = boto3.resource('dynamodb').Table(os.getenv('USER_EMAILS_TABLE_NAME'))
+    
+    # Convert full email to local part for database storage
+    from common_utils.email_helpers import to_local
+    assist_local = to_local(test_agent_email)
+    
     test_item = {
         'pk': f"uid:{test_user_id}",
         'sk': 'data',
         'user_id': test_user_id,
         'assist_email': test_agent_email,
+        'assist_local': assist_local,  # Add assist_local field for GSI lookup
         'user_email': test_user_email,  # Add user_email field
         'created_at': '2024-01-15T10:00:00',
         'updated_at': '2024-01-15T10:00:00'
@@ -128,11 +134,17 @@ def test_case_3_agent_typo_wrong_person():
     
     # Setup DynamoDB test data
     table = boto3.resource('dynamodb').Table(os.getenv('USER_EMAILS_TABLE_NAME'))
+    
+    # Convert full email to local part for database storage
+    from common_utils.email_helpers import to_local
+    assist_local = to_local(test_agent_email)
+    
     test_item = {
         'pk': f"uid:{test_user_id}",
         'sk': 'data',
         'user_id': test_user_id,
         'assist_email': test_agent_email,
+        'assist_local': assist_local,  # Add assist_local field for GSI lookup
         'user_email': test_user_email,  # Add user_email field
         'created_at': '2024-01-15T10:00:00',
         'updated_at': '2024-01-15T10:00:00'
@@ -189,11 +201,18 @@ def test_case_4_two_agents_llm_disambiguation():
     
     # Setup DynamoDB test data
     table = boto3.resource('dynamodb').Table(os.getenv('USER_EMAILS_TABLE_NAME'))
+    
+    # Convert full emails to local parts for database storage
+    from common_utils.email_helpers import to_local
+    assist_local1 = to_local(test_agent1_email)
+    assist_local2 = to_local(test_agent2_email)
+    
     test_item1 = {
         'pk': f"uid:{test_user1_id}",
         'sk': 'data',
         'user_id': test_user1_id,
         'assist_email': test_agent1_email,
+        'assist_local': assist_local1,  # Add assist_local field for GSI lookup
         'user_email': test_user1_email,  # Add user_email field
         'created_at': '2024-01-15T10:00:00',
         'updated_at': '2024-01-15T10:00:00'
@@ -203,6 +222,7 @@ def test_case_4_two_agents_llm_disambiguation():
         'sk': 'data',
         'user_id': test_user2_id,
         'assist_email': test_agent2_email,
+        'assist_local': assist_local2,  # Add assist_local field for GSI lookup
         'user_email': test_user2_email,  # Add user_email field
         'created_at': '2024-01-15T10:00:00',
         'updated_at': '2024-01-15T10:00:00'
@@ -271,11 +291,17 @@ def test_case_5_missing_user_email_field():
     
     # Setup DynamoDB test data WITHOUT user_email field
     table = boto3.resource('dynamodb').Table(os.getenv('USER_EMAILS_TABLE_NAME'))
+    
+    # Convert full email to local part for database storage
+    from common_utils.email_helpers import to_local
+    assist_local = to_local(test_agent_email)
+    
     test_item = {
         'pk': f"uid:{test_user_id}",
         'sk': 'data',
         'user_id': test_user_id,
         'assist_email': test_agent_email,
+        'assist_local': assist_local,  # Add assist_local field for GSI lookup
         # Missing user_email field
         'created_at': '2024-01-15T10:00:00',
         'updated_at': '2024-01-15T10:00:00'
@@ -329,11 +355,17 @@ def test_case_6_typo_with_valid_agent():
     
     # Setup DynamoDB test data
     table = boto3.resource('dynamodb').Table(os.getenv('USER_EMAILS_TABLE_NAME'))
+    
+    # Convert full email to local part for database storage
+    from common_utils.email_helpers import to_local
+    assist_local = to_local(test_agent_email)
+    
     test_item = {
         'pk': f"uid:{test_user_id}",
         'sk': 'data',
         'user_id': test_user_id,
         'assist_email': test_agent_email,
+        'assist_local': assist_local,  # Add assist_local field for GSI lookup
         'user_email': test_user_email,
         'created_at': '2024-01-15T10:00:00',
         'updated_at': '2024-01-15T10:00:00'
@@ -390,11 +422,18 @@ def test_case_7_two_agents_one_typo():
     
     # Setup DynamoDB test data
     table = boto3.resource('dynamodb').Table(os.getenv('USER_EMAILS_TABLE_NAME'))
+    
+    # Convert full emails to local parts for database storage
+    from common_utils.email_helpers import to_local
+    assist_local1 = to_local(test_agent1_email)
+    assist_local2 = to_local(test_agent2_email)
+    
     test_item1 = {
         'pk': f"uid:{test_user1_id}",
         'sk': 'data',
         'user_id': test_user1_id,
         'assist_email': test_agent1_email,
+        'assist_local': assist_local1,  # Add assist_local field for GSI lookup
         'user_email': test_user1_email,  # Alice not in conversation
         'created_at': '2024-01-15T10:00:00',
         'updated_at': '2024-01-15T10:00:00'
@@ -404,6 +443,7 @@ def test_case_7_two_agents_one_typo():
         'sk': 'data',
         'user_id': test_user2_id,
         'assist_email': test_agent2_email,
+        'assist_local': assist_local2,  # Add assist_local field for GSI lookup
         'user_email': test_user2_email,  # Bob in conversation
         'created_at': '2024-01-15T10:00:00',
         'updated_at': '2024-01-15T10:00:00'
@@ -459,11 +499,17 @@ def test_case_8_case_insensitive_email_matching():
     
     # Setup DynamoDB test data
     table = boto3.resource('dynamodb').Table(os.getenv('USER_EMAILS_TABLE_NAME'))
+    
+    # Convert full email to local part for database storage
+    from common_utils.email_helpers import to_local
+    assist_local = to_local(test_agent_email)
+    
     test_item = {
         'pk': f"uid:{test_user_id}",
         'sk': 'data',
         'user_id': test_user_id,
         'assist_email': test_agent_email,
+        'assist_local': assist_local,  # Add assist_local field for GSI lookup
         'user_email': test_user_email,  # Mixed case
         'created_at': '2024-01-15T10:00:00',
         'updated_at': '2024-01-15T10:00:00'
@@ -519,11 +565,17 @@ def test_case_9_email_with_display_name():
     
     # Setup DynamoDB test data
     table = boto3.resource('dynamodb').Table(os.getenv('USER_EMAILS_TABLE_NAME'))
+    
+    # Convert full email to local part for database storage
+    from common_utils.email_helpers import to_local
+    assist_local = to_local(test_agent_email)
+    
     test_item = {
         'pk': f"uid:{test_user_id}",
         'sk': 'data',
         'user_id': test_user_id,
         'assist_email': test_agent_email,
+        'assist_local': assist_local,  # Add assist_local field for GSI lookup
         'user_email': test_user_email,
         'created_at': '2024-01-15T10:00:00',
         'updated_at': '2024-01-15T10:00:00'
@@ -580,11 +632,18 @@ def test_case_10_all_agents_typos():
     
     # Setup DynamoDB test data
     table = boto3.resource('dynamodb').Table(os.getenv('USER_EMAILS_TABLE_NAME'))
+    
+    # Convert full emails to local parts for database storage
+    from common_utils.email_helpers import to_local
+    assist_local1 = to_local(test_agent1_email)
+    assist_local2 = to_local(test_agent2_email)
+    
     test_item1 = {
         'pk': f"uid:{test_user1_id}",
         'sk': 'data',
         'user_id': test_user1_id,
         'assist_email': test_agent1_email,
+        'assist_local': assist_local1,  # Add assist_local field for GSI lookup
         'user_email': test_user1_email,
         'created_at': '2024-01-15T10:00:00',
         'updated_at': '2024-01-15T10:00:00'
@@ -594,6 +653,7 @@ def test_case_10_all_agents_typos():
         'sk': 'data',
         'user_id': test_user2_id,
         'assist_email': test_agent2_email,
+        'assist_local': assist_local2,  # Add assist_local field for GSI lookup
         'user_email': test_user2_email,
         'created_at': '2024-01-15T10:00:00',
         'updated_at': '2024-01-15T10:00:00'
