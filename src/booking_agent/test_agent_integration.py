@@ -313,77 +313,72 @@ def test_case_5_share_availability():
     print("\n=== Case 5: Share Availability (End-to-End) ===")
     
     # Use persistent test user
-    test_agent_email = f"availability-agent-{uuid.uuid4().hex[:8]}@bhaang.com"
+    test_agent_email = TEST_AGENT_EMAIL
     
     start = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d")
     end = (datetime.now() + timedelta(days=10)).strftime("%Y-%m-%d")
     
-    try:
-        # Setup DynamoDB test data
-        _setup_test_user(test_agent_email, TEST_USER_EMAIL, TEST_USER_ID)
-        
-        # Simulate a realistic email conversation where someone asks for availability
-        body = (
-            f"@{test_agent_email} please share my availability for {start} to {end}!\n\n"
-            f"On Sun, 6 Jul 2025 at 06:48, John Doe <john.doe@example.com> wrote:\n"
-            f"> Hi {TEST_USER_EMAIL},\n>\n"
-            f"> I'd like to schedule a meeting with you next week. Could you please share\n"
-            f"> your availability between {start} and {end}?\n>\n"
-            f"> Thanks,\n"
-            f"> John\n>\n"
-            f"> On Sun, 6 Jul 2025 at 06:31, {TEST_USER_EMAIL} wrote:\n"
-            f">> Hi John,\n>>\n"
-            f">> Sure, let me check my calendar and get back to you.\n>>\n"
-            f">> Best regards,\n"
-            f">> Sourav"
-        )
-        
-        parsed_email = _base_parsed_email(
-            "Re: Meeting request", 
-            body,
-            to=[test_agent_email, "john.doe@example.com"],  # Both booking agent and John
-            from_email=TEST_USER_EMAIL
-        )
-        
-        print(f"📅 Requesting availability for: {start} to {end}")
-        print(f"👤 User: {TEST_USER_EMAIL}")
-        print(f"🤖 Agent: {test_agent_email}")
-        print(f"📧 Recipients: John Doe + Agent")
-        
-        print(f"\n📋 EXPECTED BEHAVIOR:")
-        print(f"   • Agent should resolve calendar owner successfully")
-        print(f"   • Should check calendar for {start} to {end}")
-        print(f"   • Response should contain available time slots")
-        print(f"   • Response should end with 'By VibeCal'")
-        print(f"   • Response should be sent to John Doe")
-        
-        result = process_booking_request(parsed_email)
-        print(f"\nResult: {result}")
-        
-        if result["action"] == "processed":
-            print(f"✅ SUCCESS: End-to-end flow completed successfully")
-            print(f"📧 AI Response:")
+    # Setup DynamoDB test data (already exists, but ensure it's correct)
+    _setup_test_user(test_agent_email, TEST_USER_EMAIL, TEST_USER_ID)
+    
+    # Simulate a realistic email conversation where someone asks for availability
+    body = (
+        f"@{test_agent_email} please share my availability for {start} to {end}!\n\n"
+        f"On Sun, 6 Jul 2025 at 06:48, John Doe <john.doe@example.com> wrote:\n"
+        f"> Hi {TEST_USER_EMAIL},\n>\n"
+        f"> I'd like to schedule a meeting with you next week. Could you please share\n"
+        f"> your availability between {start} and {end}?\n>\n"
+        f"> Thanks,\n"
+        f"> John\n>\n"
+        f"> On Sun, 6 Jul 2025 at 06:31, {TEST_USER_EMAIL} wrote:\n"
+        f">> Hi John,\n>>\n"
+        f">> Sure, let me check my calendar and get back to you.\n>>\n"
+        f">> Best regards,\n"
+        f">> Sourav"
+    )
+    
+    parsed_email = _base_parsed_email(
+        "Re: Meeting request", 
+        body,
+        to=[test_agent_email, "john.doe@example.com"],  # Both booking agent and John
+        from_email=TEST_USER_EMAIL
+    )
+    
+    print(f"📅 Requesting availability for: {start} to {end}")
+    print(f"👤 User: {TEST_USER_EMAIL}")
+    print(f"🤖 Agent: {test_agent_email}")
+    print(f"📧 Recipients: John Doe + Agent")
+    
+    print(f"\n📋 EXPECTED BEHAVIOR:")
+    print(f"   • Agent should resolve calendar owner successfully")
+    print(f"   • Should check calendar for {start} to {end}")
+    print(f"   • Response should contain available time slots")
+    print(f"   • Response should end with 'By VibeCal'")
+    print(f"   • Response should be sent to John Doe")
+    
+    result = process_booking_request(parsed_email)
+    print(f"\nResult: {result}")
+    
+    if result["action"] == "processed":
+        print(f"✅ SUCCESS: End-to-end flow completed successfully")
+        print(f"📧 AI Response:")
+        print(f"{'─'*60}")
+        print(result["ai_response"])
+        print(f"{'─'*60}")
+        print(f"\n📋 VERIFICATION:")
+        print(f"   • Action: {result['action']}")
+        print(f"   • Calendar User ID: {result['calendar_user_id']}")
+        print(f"   • Booking Email: {result['booking_email']}")
+        print(f"   • Response contains 'By VibeCal': {'By VibeCal' in result['ai_response']}")
+    else:
+        print(f"❌ FAILED: Expected processed, got {result.get('action')}")
+        if result.get("clarification_message"):
+            print(f"📧 Clarification message:")
             print(f"{'─'*60}")
-            print(result["ai_response"])
+            print(result["clarification_message"])
             print(f"{'─'*60}")
-            print(f"\n📋 VERIFICATION:")
-            print(f"   • Action: {result['action']}")
-            print(f"   • Calendar User ID: {result['calendar_user_id']}")
-            print(f"   • Booking Email: {result['booking_email']}")
-            print(f"   • Response contains 'By VibeCal': {'By VibeCal' in result['ai_response']}")
-        else:
-            print(f"❌ FAILED: Expected processed, got {result.get('action')}")
-            if result.get("clarification_message"):
-                print(f"📧 Clarification message:")
-                print(f"{'─'*60}")
-                print(result["clarification_message"])
-                print(f"{'─'*60}")
-        
-        return result
-        
-    finally:
-        # Restore persistent user data
-        _setup_test_user(TEST_AGENT_EMAIL, TEST_USER_EMAIL, TEST_USER_ID)
+    
+    return result
 
 
 def test_case_6_book_event():
@@ -391,114 +386,109 @@ def test_case_6_book_event():
     print("\n=== Case 6: Book Event (End-to-End) ===")
     
     # Use persistent test user
-    test_agent_email = f"booking-agent-{uuid.uuid4().hex[:8]}@bhaang.com"
+    test_agent_email = TEST_AGENT_EMAIL
     
     meeting_date = (datetime.now() + timedelta(days=3)).strftime("%Y-%m-%d")
     start_time = "10:00"
     end_time = "11:00"
     title = f"AI-Book-Test {uuid.uuid4().hex[:4]}"
     
-    try:
-        # Setup DynamoDB test data
-        _setup_test_user(test_agent_email, TEST_USER_EMAIL, TEST_USER_ID)
+    # Setup DynamoDB test data (already exists, but ensure it's correct)
+    _setup_test_user(test_agent_email, TEST_USER_EMAIL, TEST_USER_ID)
+    
+    # Simulate a realistic email conversation where someone wants to book
+    body = (
+        f"@{test_agent_email} please book {meeting_date} {start_time}-{end_time} for '{title}'\n\n"
+        f"On Tue, 8 Jul 2025 at 14:20, Mike Johnson <mike.johnson@startup.com> wrote:\n"
+        f"> Hi Sourav,\n>\n"
+        f"> Perfect! I'd like to book the {start_time} slot on {meeting_date} for '{title}'.\n"
+        f"> Please go ahead and schedule it.\n>\n"
+        f"> Thanks,\n"
+        f"> Mike\n>\n"
+        f"> On Tue, 8 Jul 2025 at 13:45, {test_agent_email} wrote:\n"
+        f">> Hi Mike,\n>>\n"
+        f">> Here are Sourav's available slots for {meeting_date}:\n>>\n"
+        f">> - {meeting_date} 09:00-10:00\n"
+        f">> - {meeting_date} 10:00-11:00\n"
+        f">> - {meeting_date} 14:00-15:00\n"
+        f">> - {meeting_date} 16:00-17:00\n>>\n"
+        f">> Let me know which time works best for you!\n>>\n"
+        f">> By VibeCal\n>\n"
+        f"> On Tue, 8 Jul 2025 at 12:30, Mike Johnson <mike.johnson@startup.com> wrote:\n"
+        f">> Hi Sourav,\n>>\n"
+        f">> I'd like to schedule a meeting with you. Could you please share your\n"
+        f">> availability for {meeting_date}?\n>>\n"
+        f">> Best regards,\n"
+        f">> Mike\n>\n"
+        f"> On Tue, 8 Jul 2025 at 12:15, {TEST_USER_EMAIL} wrote:\n"
+        f">> Hi Mike,\n>>\n"
+        f">> I'll have my assistant check my calendar and share my availability.\n>>\n"
+        f">> Thanks,\n"
+        f">> Sourav"
+    )
+    
+    parsed_email = _base_parsed_email(
+        "Re: Meeting booking", 
+        body,
+        to=[TEST_USER_EMAIL, test_agent_email],  # Mike is emailing both Sourav and his agent
+        from_email="mike.johnson@startup.com"
+    )
+    
+    print(f"📅 Meeting date: {meeting_date}")
+    print(f"⏰ Time: {start_time}-{end_time}")
+    print(f"📝 Title: {title}")
+    print(f"👤 User: {TEST_USER_EMAIL}")
+    print(f"🤖 Agent: {test_agent_email}")
+    print(f"📧 From: Mike Johnson (wanting to book)")
+    
+    print(f"\n📋 EXPECTED BEHAVIOR:")
+    print(f"   • Agent should resolve calendar owner successfully")
+    print(f"   • Should recognize Mike's request to book the {start_time} slot")
+    print(f"   • Should create calendar event for {meeting_date} {start_time}-{end_time}")
+    print(f"   • Response should confirm booking was successful")
+    print(f"   • Response should include 'Event ID: [some-id]'")
+    print(f"   • Response should end with 'By VibeCal'")
+    
+    result = process_booking_request(parsed_email)
+    print(f"\nResult: {result}")
+    
+    if result["action"] == "processed":
+        print(f"✅ SUCCESS: End-to-end booking flow completed successfully")
+        print(f"📧 AI Response:")
+        print(f"{'─'*60}")
+        print(result["ai_response"])
+        print(f"{'─'*60}")
         
-        # Simulate a realistic email conversation where someone wants to book
-        body = (
-            f"@{test_agent_email} please book {meeting_date} {start_time}-{end_time} for '{title}'\n\n"
-            f"On Tue, 8 Jul 2025 at 14:20, Mike Johnson <mike.johnson@startup.com> wrote:\n"
-            f"> Hi Sourav,\n>\n"
-            f"> Perfect! I'd like to book the {start_time} slot on {meeting_date} for '{title}'.\n"
-            f"> Please go ahead and schedule it.\n>\n"
-            f"> Thanks,\n"
-            f"> Mike\n>\n"
-            f"> On Tue, 8 Jul 2025 at 13:45, {test_agent_email} wrote:\n"
-            f">> Hi Mike,\n>>\n"
-            f">> Here are Sourav's available slots for {meeting_date}:\n>>\n"
-            f">> - {meeting_date} 09:00-10:00\n"
-            f">> - {meeting_date} 10:00-11:00\n"
-            f">> - {meeting_date} 14:00-15:00\n"
-            f">> - {meeting_date} 16:00-17:00\n>>\n"
-            f">> Let me know which time works best for you!\n>>\n"
-            f">> By VibeCal\n>\n"
-            f"> On Tue, 8 Jul 2025 at 12:30, Mike Johnson <mike.johnson@startup.com> wrote:\n"
-            f">> Hi Sourav,\n>>\n"
-            f">> I'd like to schedule a meeting with you. Could you please share your\n"
-            f">> availability for {meeting_date}?\n>>\n"
-            f">> Best regards,\n"
-            f">> Mike\n>\n"
-            f"> On Tue, 8 Jul 2025 at 12:15, {TEST_USER_EMAIL} wrote:\n"
-            f">> Hi Mike,\n>>\n"
-            f">> I'll have my assistant check my calendar and share my availability.\n>>\n"
-            f">> Thanks,\n"
-            f">> Sourav"
-        )
-        
-        parsed_email = _base_parsed_email(
-            "Re: Meeting booking", 
-            body,
-            to=[TEST_USER_EMAIL, test_agent_email],  # Mike is emailing both Sourav and his agent
-            from_email="mike.johnson@startup.com"
-        )
-        
-        print(f"📅 Meeting date: {meeting_date}")
-        print(f"⏰ Time: {start_time}-{end_time}")
-        print(f"📝 Title: {title}")
-        print(f"👤 User: {TEST_USER_EMAIL}")
-        print(f"🤖 Agent: {test_agent_email}")
-        print(f"📧 From: Mike Johnson (wanting to book)")
-        
-        print(f"\n📋 EXPECTED BEHAVIOR:")
-        print(f"   • Agent should resolve calendar owner successfully")
-        print(f"   • Should recognize Mike's request to book the {start_time} slot")
-        print(f"   • Should create calendar event for {meeting_date} {start_time}-{end_time}")
-        print(f"   • Response should confirm booking was successful")
-        print(f"   • Response should include 'Event ID: [some-id]'")
-        print(f"   • Response should end with 'By VibeCal'")
-        
-        result = process_booking_request(parsed_email)
-        print(f"\nResult: {result}")
-        
-        if result["action"] == "processed":
-            print(f"✅ SUCCESS: End-to-end booking flow completed successfully")
-            print(f"📧 AI Response:")
-            print(f"{'─'*60}")
-            print(result["ai_response"])
-            print(f"{'─'*60}")
+        # Extract event-id from the response
+        match = re.search(r"Event ID:\s*([\w-]+)", result["ai_response"])
+        if match:
+            event_id = match.group(1)
+            print(f"\n📋 VERIFICATION:")
+            print(f"   • Action: {result['action']}")
+            print(f"   • Calendar User ID: {result['calendar_user_id']}")
+            print(f"   • Booking Email: {result['booking_email']}")
+            print(f"   • Event ID: {event_id}")
+            print(f"   • Response contains 'By VibeCal': {'By VibeCal' in result['ai_response']}")
             
-            # Extract event-id from the response
-            match = re.search(r"Event ID:\s*([\w-]+)", result["ai_response"])
-            if match:
-                event_id = match.group(1)
-                print(f"\n📋 VERIFICATION:")
-                print(f"   • Action: {result['action']}")
-                print(f"   • Calendar User ID: {result['calendar_user_id']}")
-                print(f"   • Booking Email: {result['booking_email']}")
-                print(f"   • Event ID: {event_id}")
-                print(f"   • Response contains 'By VibeCal': {'By VibeCal' in result['ai_response']}")
-                
-                # Verify via Google Calendar API that the event exists
-                calendar_assistant = CalendarAssistant(TEST_USER_ID)
-                availability = calendar_assistant.get_availability(meeting_date, meeting_date)
-                ids = {e["id"] for e in availability["events"]}
-                if event_id in ids:
-                    print(f"   • Event verified in Google Calendar: ✅")
-                else:
-                    print(f"   • Event NOT found in Google Calendar: ❌")
+            # Verify via Google Calendar API that the event exists
+            calendar_assistant = CalendarAssistant(TEST_USER_ID)
+            availability = calendar_assistant.get_availability(meeting_date, meeting_date)
+            ids = {e["id"] for e in availability["events"]}
+            if event_id in ids:
+                print(f"   • Event verified in Google Calendar: ✅")
             else:
-                print(f"   • Event ID not found in response: ❌")
+                print(f"   • Event NOT found in Google Calendar: ❌")
         else:
-            print(f"❌ FAILED: Expected processed, got {result.get('action')}")
-            if result.get("clarification_message"):
-                print(f"📧 Clarification message:")
-                print(f"{'─'*60}")
-                print(result["clarification_message"])
-                print(f"{'─'*60}")
-        
-        return result
-        
-    finally:
-        # Restore persistent user data
-        _setup_test_user(TEST_AGENT_EMAIL, TEST_USER_EMAIL, TEST_USER_ID)
+            print(f"   • Event ID not found in response: ❌")
+    else:
+        print(f"❌ FAILED: Expected processed, got {result.get('action')}")
+        if result.get("clarification_message"):
+            print(f"📧 Clarification message:")
+            print(f"{'─'*60}")
+            print(result["clarification_message"])
+            print(f"{'─'*60}")
+    
+    return result
 
 
 def test_case_7_cancel_event():
@@ -506,143 +496,138 @@ def test_case_7_cancel_event():
     print("\n=== Case 7: Cancel Event (End-to-End) ===")
     
     # Use persistent test user
-    test_agent_email = f"cancel-agent-{uuid.uuid4().hex[:8]}@bhaang.com"
+    test_agent_email = TEST_AGENT_EMAIL
     
     meeting_date = (datetime.now() + timedelta(days=4)).strftime("%Y-%m-%d")
     start_time = "14:00"
     end_time = "15:00"
     title = f"AI-Cancel-Test {uuid.uuid4().hex[:4]}"
     
-    try:
-        # Setup DynamoDB test data
-        _setup_test_user(test_agent_email, TEST_USER_EMAIL, TEST_USER_ID)
+    # Setup DynamoDB test data (already exists, but ensure it's correct)
+    _setup_test_user(test_agent_email, TEST_USER_EMAIL, TEST_USER_ID)
+    
+    # First create an event directly via the high-level helper
+    calendar_assistant = CalendarAssistant(TEST_USER_ID)
+    seed_event = calendar_assistant.book_event(
+        date=meeting_date,
+        start_time=start_time,
+        end_time=end_time,
+        title=title,
+        attendees=["lisa.chen@techcorp.com", TEST_USER_EMAIL],
+    )
+    event_id = seed_event["event_id"]
+    print(f"Seeded calendar with event {event_id} to be cancelled.")
+    
+    # Simulate a realistic email conversation where someone wants to cancel
+    body = (
+        f"@{test_agent_email} please cancel the meeting with ID {event_id}\n\n"
+        f"On Wed, 9 Jul 2025 at 16:30, Lisa Chen <lisa.chen@techcorp.com> wrote:\n"
+        f"> Hi Sourav,\n>\n"
+        f"> I'm sorry, but I need to reschedule our meeting. Can you please cancel\n"
+        f"> the current booking? I'll reach out again to find a new time.\n>\n"
+        f"> Thanks,\n"
+        f"> Lisa\n>\n"
+        f"> On Wed, 9 Jul 2025 at 15:00, {test_agent_email} wrote:\n"
+        f">> Hi Lisa,\n>>\n"
+        f">> I've successfully booked your meeting for {meeting_date} at {start_time}-{end_time}.\n"
+        f">> Event ID: {event_id}\n>>\n"
+        f">> Looking forward to our discussion!\n>>\n"
+        f">> By VibeCal\n>\n"
+        f"> On Wed, 9 Jul 2025 at 14:20, Lisa Chen <lisa.chen@techcorp.com> wrote:\n"
+        f">> Hi Sourav,\n>>\n"
+        f">> Perfect! I'd like to book the {start_time} slot on {meeting_date} for '{title}'.\n"
+        f">> Please go ahead and schedule it.\n>>\n"
+        f">> Thanks,\n"
+        f">> Lisa\n>\n"
+        f"> On Wed, 9 Jul 2025 at 13:45, {test_agent_email} wrote:\n"
+        f">> Hi Lisa,\n>>\n"
+        f">> Here are Sourav's available slots for {meeting_date}:\n>>\n"
+        f">> - {meeting_date} 09:00-10:00\n"
+        f">> - {meeting_date} 10:00-11:00\n"
+        f">> - {meeting_date} 14:00-15:00\n"
+        f">> - {meeting_date} 16:00-17:00\n>>\n"
+        f">> Let me know which time works best for you!\n>>\n"
+        f">> By VibeCal\n>\n"
+        f"> On Wed, 9 Jul 2025 at 12:30, Lisa Chen <lisa.chen@techcorp.com> wrote:\n"
+        f">> Hi Sourav,\n>>\n"
+        f">> I'd like to schedule a meeting with you. Could you please share your\n"
+        f">> availability for {meeting_date}?\n>>\n"
+        f">> Best regards,\n"
+        f">> Lisa\n>\n"
+        f"> On Wed, 9 Jul 2025 at 12:15, {TEST_USER_EMAIL} wrote:\n"
+        f">> Hi Lisa,\n>>\n"
+        f">> I'll have my assistant check my calendar and share my availability.\n>>\n"
+        f">> Thanks,\n"
+        f">> Sourav"
+    )
+    
+    parsed_email = _base_parsed_email(
+        "Re: Meeting cancellation", 
+        body,
+        to=[TEST_USER_EMAIL, test_agent_email],  # Lisa is emailing both Sourav and his agent
+        from_email="lisa.chen@techcorp.com"
+    )
+    
+    print(f"📅 Meeting date: {meeting_date}")
+    print(f"⏰ Time: {start_time}-{end_time}")
+    print(f"📝 Title: {title}")
+    print(f"🆔 Event ID: {event_id}")
+    print(f"👤 User: {TEST_USER_EMAIL}")
+    print(f"🤖 Agent: {test_agent_email}")
+    print(f"📧 From: Lisa Chen (wanting to cancel)")
+    
+    print(f"\n📋 EXPECTED BEHAVIOR:")
+    print(f"   • Agent should resolve calendar owner successfully")
+    print(f"   • Should recognize Lisa's request to cancel the meeting")
+    print(f"   • Should cancel calendar event with ID: {event_id}")
+    print(f"   • Response should confirm cancellation was successful")
+    print(f"   • Response should end with 'By VibeCal'")
+    print(f"   • Event should no longer exist in Google Calendar")
+    
+    result = process_booking_request(parsed_email)
+    print(f"\nResult: {result}")
+    
+    if result["action"] == "processed":
+        print(f"✅ SUCCESS: End-to-end cancellation flow completed successfully")
+        print(f"📧 AI Response:")
+        print(f"{'─'*60}")
+        print(result["ai_response"])
+        print(f"{'─'*60}")
         
-        # First create an event directly via the high-level helper
-        calendar_assistant = CalendarAssistant(TEST_USER_ID)
-        seed_event = calendar_assistant.book_event(
-            date=meeting_date,
-            start_time=start_time,
-            end_time=end_time,
-            title=title,
-            attendees=["lisa.chen@techcorp.com", TEST_USER_EMAIL],
-        )
-        event_id = seed_event["event_id"]
-        print(f"Seeded calendar with event {event_id} to be cancelled.")
+        print(f"\n📋 VERIFICATION:")
+        print(f"   • Action: {result['action']}")
+        print(f"   • Calendar User ID: {result['calendar_user_id']}")
+        print(f"   • Booking Email: {result['booking_email']}")
+        print(f"   • Response contains 'By VibeCal': {'By VibeCal' in result['ai_response']}")
         
-        # Simulate a realistic email conversation where someone wants to cancel
-        body = (
-            f"@{test_agent_email} please cancel the meeting with ID {event_id}\n\n"
-            f"On Wed, 9 Jul 2025 at 16:30, Lisa Chen <lisa.chen@techcorp.com> wrote:\n"
-            f"> Hi Sourav,\n>\n"
-            f"> I'm sorry, but I need to reschedule our meeting. Can you please cancel\n"
-            f"> the current booking? I'll reach out again to find a new time.\n>\n"
-            f"> Thanks,\n"
-            f"> Lisa\n>\n"
-            f"> On Wed, 9 Jul 2025 at 15:00, {test_agent_email} wrote:\n"
-            f">> Hi Lisa,\n>>\n"
-            f">> I've successfully booked your meeting for {meeting_date} at {start_time}-{end_time}.\n"
-            f">> Event ID: {event_id}\n>>\n"
-            f">> Looking forward to our discussion!\n>>\n"
-            f">> By VibeCal\n>\n"
-            f"> On Wed, 9 Jul 2025 at 14:20, Lisa Chen <lisa.chen@techcorp.com> wrote:\n"
-            f">> Hi Sourav,\n>>\n"
-            f">> Perfect! I'd like to book the {start_time} slot on {meeting_date} for '{title}'.\n"
-            f">> Please go ahead and schedule it.\n>>\n"
-            f">> Thanks,\n"
-            f">> Lisa\n>\n"
-            f"> On Wed, 9 Jul 2025 at 13:45, {test_agent_email} wrote:\n"
-            f">> Hi Lisa,\n>>\n"
-            f">> Here are Sourav's available slots for {meeting_date}:\n>>\n"
-            f">> - {meeting_date} 09:00-10:00\n"
-            f">> - {meeting_date} 10:00-11:00\n"
-            f">> - {meeting_date} 14:00-15:00\n"
-            f">> - {meeting_date} 16:00-17:00\n>>\n"
-            f">> Let me know which time works best for you!\n>>\n"
-            f">> By VibeCal\n>\n"
-            f"> On Wed, 9 Jul 2025 at 12:30, Lisa Chen <lisa.chen@techcorp.com> wrote:\n"
-            f">> Hi Sourav,\n>>\n"
-            f">> I'd like to schedule a meeting with you. Could you please share your\n"
-            f">> availability for {meeting_date}?\n>>\n"
-            f">> Best regards,\n"
-            f">> Lisa\n>\n"
-            f"> On Wed, 9 Jul 2025 at 12:15, {TEST_USER_EMAIL} wrote:\n"
-            f">> Hi Lisa,\n>>\n"
-            f">> I'll have my assistant check my calendar and share my availability.\n>>\n"
-            f">> Thanks,\n"
-            f">> Sourav"
-        )
-        
-        parsed_email = _base_parsed_email(
-            "Re: Meeting cancellation", 
-            body,
-            to=[TEST_USER_EMAIL, test_agent_email],  # Lisa is emailing both Sourav and his agent
-            from_email="lisa.chen@techcorp.com"
-        )
-        
-        print(f"📅 Meeting date: {meeting_date}")
-        print(f"⏰ Time: {start_time}-{end_time}")
-        print(f"📝 Title: {title}")
-        print(f"🆔 Event ID: {event_id}")
-        print(f"👤 User: {TEST_USER_EMAIL}")
-        print(f"🤖 Agent: {test_agent_email}")
-        print(f"📧 From: Lisa Chen (wanting to cancel)")
-        
-        print(f"\n📋 EXPECTED BEHAVIOR:")
-        print(f"   • Agent should resolve calendar owner successfully")
-        print(f"   • Should recognize Lisa's request to cancel the meeting")
-        print(f"   • Should cancel calendar event with ID: {event_id}")
-        print(f"   • Response should confirm cancellation was successful")
-        print(f"   • Response should end with 'By VibeCal'")
-        print(f"   • Event should no longer exist in Google Calendar")
-        
-        result = process_booking_request(parsed_email)
-        print(f"\nResult: {result}")
-        
-        if result["action"] == "processed":
-            print(f"✅ SUCCESS: End-to-end cancellation flow completed successfully")
-            print(f"📧 AI Response:")
+        # After agent cancels, verify the event exists but is cancelled
+        try:
+            event_data = calendar_assistant.get_event(event_id)
+            if event_data.get('status') == 'cancelled':
+                print(f"   • Event {event_id} successfully cancelled (status: cancelled): ✅")
+            else:
+                print(f"   • Event not cancelled, status: {event_data.get('status')}: ❌")
+        except Exception as exc:
+            if "not found" in str(exc).lower():
+                print(f"   • Event {event_id} completely removed from calendar: ✅")
+            else:
+                print(f"   • Error checking event status: {exc}")
+    else:
+        print(f"❌ FAILED: Expected processed, got {result.get('action')}")
+        if result.get("clarification_message"):
+            print(f"📧 Clarification message:")
             print(f"{'─'*60}")
-            print(result["ai_response"])
+            print(result["clarification_message"])
             print(f"{'─'*60}")
-            
-            print(f"\n📋 VERIFICATION:")
-            print(f"   • Action: {result['action']}")
-            print(f"   • Calendar User ID: {result['calendar_user_id']}")
-            print(f"   • Booking Email: {result['booking_email']}")
-            print(f"   • Response contains 'By VibeCal': {'By VibeCal' in result['ai_response']}")
-            
-            # After agent cancels, verify the event exists but is cancelled
-            try:
-                event_data = calendar_assistant.get_event(event_id)
-                if event_data.get('status') == 'cancelled':
-                    print(f"   • Event {event_id} successfully cancelled (status: cancelled): ✅")
-                else:
-                    print(f"   • Event not cancelled, status: {event_data.get('status')}: ❌")
-            except Exception as exc:
-                if "not found" in str(exc).lower():
-                    print(f"   • Event {event_id} completely removed from calendar: ✅")
-                else:
-                    print(f"   • Error checking event status: {exc}")
-        else:
-            print(f"❌ FAILED: Expected processed, got {result.get('action')}")
-            if result.get("clarification_message"):
-                print(f"📧 Clarification message:")
-                print(f"{'─'*60}")
-                print(result["clarification_message"])
-                print(f"{'─'*60}")
-        
-        return result
-        
-    finally:
-        # Restore persistent user data
-        _setup_test_user(TEST_AGENT_EMAIL, TEST_USER_EMAIL, TEST_USER_ID)
+    
+    return result
 
 
 def test_case_8_multiple_agents_llm_disambiguation():
     """Case 8: Multiple agents in conversation, LLM should disambiguate"""
     print("\n=== Case 8: Multiple agents, LLM disambiguation ===")
     
-    # Use persistent test user for one agent, create another for testing
+    # Create two new test agents and users (don't modify persistent test user)
     test_agent1_email = f"marketing-agent-{uuid.uuid4().hex[:8]}@bhaang.com"
     test_agent2_email = f"sales-agent-{uuid.uuid4().hex[:8]}@bhaang.com"
     test_user1_email = "marketing@example.com"  # Marketing team email
@@ -656,13 +641,14 @@ def test_case_8_multiple_agents_llm_disambiguation():
     assist_local1 = to_local(test_agent1_email)
     assist_local2 = to_local(test_agent2_email)
     
-    # Use persistent user for first agent, create temporary user for second
+    # Create two temporary test users
+    test_user1_id = f"test-user-{uuid.uuid4().hex[:8]}"
     test_user2_id = f"test-user-{uuid.uuid4().hex[:8]}"
     
     test_item1 = {
-        'pk': f"uid:{TEST_USER_ID}",
+        'pk': f"uid:{test_user1_id}",
         'sk': 'data',
-        'user_id': TEST_USER_ID,
+        'user_id': test_user1_id,
         'assist_email': test_agent1_email,
         'assist_local': assist_local1,
         'user_email': test_user1_email,
@@ -755,10 +741,10 @@ def test_case_8_multiple_agents_llm_disambiguation():
         return result
         
     finally:
-        # Restore persistent user data and cleanup temporary user
-        _setup_test_user(TEST_AGENT_EMAIL, TEST_USER_EMAIL, TEST_USER_ID)
+        # Cleanup both temporary test users
+        table.delete_item(Key={'pk': f"uid:{test_user1_id}", 'sk': 'data'})
         table.delete_item(Key={'pk': f"uid:{test_user2_id}", 'sk': 'data'})
-        print(f"🧹 Cleaned up temporary test user: {test_user2_id}")
+        print(f"🧹 Cleaned up temporary test users: {test_user1_id}, {test_user2_id}")
 
 
 # ---------------------------------------------------------------------------
