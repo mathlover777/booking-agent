@@ -49,7 +49,7 @@ class TestCalendarOwnerResolver(unittest.TestCase):
         self.sample_parsed_email = {
             "subject": "Test Meeting",
             "from": ["sender@example.com"],
-            "to": ["booking@bhaang.com"],
+            "to": ["booking.dev@bhaang.com"],
             "cc": ["other@example.com"],
             "body": "Let's schedule a meeting",
             "date": "2024-01-01",
@@ -60,23 +60,23 @@ class TestCalendarOwnerResolver(unittest.TestCase):
         """Test finding a single booking email in the conversation."""
         parsed_email = {
             "from": ["user@example.com"],
-            "to": ["booking@bhaang.com"],
+            "to": ["booking.dev@bhaang.com"],
             "cc": ["other@example.com"]
         }
         
         result = _list_booking_emails(parsed_email)
-        self.assertEqual(result, ["booking@bhaang.com"])
+        self.assertEqual(result, ["booking.dev@bhaang.com"])
     
     def test_list_booking_emails_multiple_booking_emails(self):
         """Test finding multiple booking emails in the conversation."""
         parsed_email = {
             "from": ["user@example.com"],
-            "to": ["booking@bhaang.com", "booking2@bhaang.com"],
+            "to": ["booking.dev@bhaang.com", "booking2.dev@bhaang.com"],
             "cc": ["other@example.com"]
         }
         
         result = _list_booking_emails(parsed_email)
-        self.assertEqual(set(result), {"booking@bhaang.com", "booking2@bhaang.com"})
+        self.assertEqual(set(result), {"booking.dev@bhaang.com", "booking2.dev@bhaang.com"})
     
     def test_list_booking_emails_no_booking_emails(self):
         """Test when no booking emails are found."""
@@ -93,43 +93,43 @@ class TestCalendarOwnerResolver(unittest.TestCase):
         """Test handling different email formats."""
         parsed_email = {
             "from": ["User Name <user@example.com>"],
-            "to": ["Booking Agent <booking@bhaang.com>"],
+            "to": ["Booking Agent <booking.dev@bhaang.com>"],
             "cc": ["Other <other@example.com>"]
         }
         
         result = _list_booking_emails(parsed_email)
-        self.assertEqual(result, ["booking@bhaang.com"])
+        self.assertEqual(result, ["booking.dev@bhaang.com"])
     
     @patch('booking_agent.calendar_owner_resolver._user_email_table')
     def test_lookup_user_records_single_user(self, mock_table):
         """Test looking up a single user record."""
         mock_table.query.return_value = {
-            "Items": [{"user_id": "user123", "assist_email": "booking@bhaang.com"}]
+            "Items": [{"user_id": "user123", "assist_local": "booking.dev"}]
         }
         
-        result = _lookup_user_records(["booking@bhaang.com"])
+        result = _lookup_user_records(["booking.dev@bhaang.com"])
         
-        self.assertEqual(result, {"booking@bhaang.com": {"user_id": "user123", "assist_email": "booking@bhaang.com"}})
+        self.assertEqual(result, {"booking.dev@bhaang.com": {"user_id": "user123", "assist_local": "booking.dev"}})
         mock_table.query.assert_called_once()
     
     @patch('booking_agent.calendar_owner_resolver._user_email_table')
     def test_lookup_user_records_multiple_users(self, mock_table):
         """Test looking up multiple user records."""
         def mock_query(**kwargs):
-            email = kwargs['ExpressionAttributeValues'][':email']
-            if email == "booking1@bhaang.com":
-                return {"Items": [{"user_id": "user1", "assist_email": "booking1@bhaang.com"}]}
-            elif email == "booking2@bhaang.com":
-                return {"Items": [{"user_id": "user2", "assist_email": "booking2@bhaang.com"}]}
+            local = kwargs['ExpressionAttributeValues'][':local']
+            if local == "booking1.dev":
+                return {"Items": [{"user_id": "user1", "assist_local": "booking1.dev"}]}
+            elif local == "booking2.dev":
+                return {"Items": [{"user_id": "user2", "assist_local": "booking2.dev"}]}
             return {"Items": []}
         
         mock_table.query.side_effect = mock_query
         
-        result = _lookup_user_records(["booking1@bhaang.com", "booking2@bhaang.com"])
+        result = _lookup_user_records(["booking1.dev@bhaang.com", "booking2.dev@bhaang.com"])
         
         expected = {
-            "booking1@bhaang.com": {"user_id": "user1", "assist_email": "booking1@bhaang.com"},
-            "booking2@bhaang.com": {"user_id": "user2", "assist_email": "booking2@bhaang.com"}
+            "booking1.dev@bhaang.com": {"user_id": "user1", "assist_local": "booking1.dev"},
+            "booking2.dev@bhaang.com": {"user_id": "user2", "assist_local": "booking2.dev"}
         }
         self.assertEqual(result, expected)
         self.assertEqual(mock_table.query.call_count, 2)
@@ -139,7 +139,7 @@ class TestCalendarOwnerResolver(unittest.TestCase):
         """Test when no user records are found."""
         mock_table.query.return_value = {"Items": []}
         
-        result = _lookup_user_records(["booking@bhaang.com"])
+        result = _lookup_user_records(["booking.dev@bhaang.com"])
         
         self.assertEqual(result, {})
     
@@ -148,7 +148,7 @@ class TestCalendarOwnerResolver(unittest.TestCase):
         """Test handling DynamoDB errors."""
         mock_table.query.side_effect = Exception("DynamoDB error")
         
-        result = _lookup_user_records(["booking@bhaang.com"])
+        result = _lookup_user_records(["booking.dev@bhaang.com"])
         
         self.assertEqual(result, {})
     
@@ -167,7 +167,7 @@ class TestCalendarOwnerResolver(unittest.TestCase):
     @patch('booking_agent.calendar_owner_resolver._lookup_user_records')
     def test_resolve_calendar_owner_no_valid_owners(self, mock_lookup, mock_list):
         """Test when booking emails exist but no valid owners found."""
-        mock_list.return_value = ["booking@bhaang.com", "booking2@bhaang.com"]
+        mock_list.return_value = ["booking.dev@bhaang.com", "booking2.dev@bhaang.com"]
         mock_lookup.return_value = {}  # No valid owners
         
         result = resolve_calendar_owner(self.sample_parsed_email)
@@ -179,11 +179,11 @@ class TestCalendarOwnerResolver(unittest.TestCase):
     @patch('booking_agent.calendar_owner_resolver._lookup_user_records')
     def test_resolve_calendar_owner_single_valid_owner(self, mock_lookup, mock_list):
         """Test when exactly one valid owner is found and in conversation."""
-        mock_list.return_value = ["booking@bhaang.com", "booking2@bhaang.com"]
+        mock_list.return_value = ["booking.dev@bhaang.com", "booking2.dev@bhaang.com"]
         mock_lookup.return_value = {
-            "booking@bhaang.com": {
+            "booking.dev@bhaang.com": {
                 "user_id": "user123", 
-                "assist_email": "booking@bhaang.com",
+                "assist_local": "booking.dev",
                 "user_email": "sender@example.com"  # User is in conversation (from sample_parsed_email)
             }
         }
@@ -192,17 +192,17 @@ class TestCalendarOwnerResolver(unittest.TestCase):
         
         self.assertEqual(result["status"], "success")
         self.assertEqual(result["user_id"], "user123")
-        self.assertEqual(result["assist_email"], "booking@bhaang.com")
+        self.assertEqual(result["assist_email"], "booking.dev@bhaang.com")
     
     @patch('booking_agent.calendar_owner_resolver._list_booking_emails')
     @patch('booking_agent.calendar_owner_resolver._lookup_user_records')
     def test_resolve_calendar_owner_owner_not_in_conversation(self, mock_lookup, mock_list):
         """Test when booking agent exists but actual user is not in conversation."""
-        mock_list.return_value = ["booking@bhaang.com"]
+        mock_list.return_value = ["booking.dev@bhaang.com"]
         mock_lookup.return_value = {
-            "booking@bhaang.com": {
+            "booking.dev@bhaang.com": {
                 "user_id": "user123", 
-                "assist_email": "booking@bhaang.com",
+                "assist_local": "booking.dev",
                 "user_email": "alice@example.com"  # User is NOT in conversation
             }
         }
@@ -216,11 +216,11 @@ class TestCalendarOwnerResolver(unittest.TestCase):
     @patch('booking_agent.calendar_owner_resolver._lookup_user_records')
     def test_resolve_calendar_owner_missing_user_email(self, mock_lookup, mock_list):
         """Test when booking agent exists but user_email field is missing."""
-        mock_list.return_value = ["booking@bhaang.com"]
+        mock_list.return_value = ["booking.dev@bhaang.com"]
         mock_lookup.return_value = {
-            "booking@bhaang.com": {
+            "booking.dev@bhaang.com": {
                 "user_id": "user123", 
-                "assist_email": "booking@bhaang.com"
+                "assist_local": "booking.dev"
                 # Missing user_email field
             }
         }
@@ -235,43 +235,43 @@ class TestCalendarOwnerResolver(unittest.TestCase):
     @patch('booking_agent.calendar_owner_resolver._disambiguate_owner_with_llm')
     def test_resolve_calendar_owner_multiple_valid_owners_llm_success(self, mock_llm, mock_lookup, mock_list):
         """Test when multiple valid owners exist and LLM successfully chooses one."""
-        mock_list.return_value = ["booking1@bhaang.com", "booking2@bhaang.com"]
+        mock_list.return_value = ["booking1.dev@bhaang.com", "booking2.dev@bhaang.com"]
         mock_lookup.return_value = {
-            "booking1@bhaang.com": {
+            "booking1.dev@bhaang.com": {
                 "user_id": "user1", 
-                "assist_email": "booking1@bhaang.com",
+                "assist_local": "booking1.dev",
                 "user_email": "sender@example.com"  # In conversation (from sample_parsed_email)
             },
-            "booking2@bhaang.com": {
+            "booking2.dev@bhaang.com": {
                 "user_id": "user2", 
-                "assist_email": "booking2@bhaang.com",
+                "assist_local": "booking2.dev",
                 "user_email": "other@example.com"  # In conversation (from sample_parsed_email)
             }
         }
-        mock_llm.return_value = "booking1@bhaang.com"
+        mock_llm.return_value = "booking1.dev@bhaang.com"
         
         result = resolve_calendar_owner(self.sample_parsed_email)
         
         self.assertEqual(result["status"], "success")
         self.assertEqual(result["user_id"], "user1")
-        self.assertEqual(result["assist_email"], "booking1@bhaang.com")
-        mock_llm.assert_called_once_with(self.sample_parsed_email, ["booking1@bhaang.com", "booking2@bhaang.com"])
+        self.assertEqual(result["assist_email"], "booking1.dev@bhaang.com")
+        mock_llm.assert_called_once_with(self.sample_parsed_email, ["booking1.dev@bhaang.com", "booking2.dev@bhaang.com"])
     
     @patch('booking_agent.calendar_owner_resolver._list_booking_emails')
     @patch('booking_agent.calendar_owner_resolver._lookup_user_records')
     @patch('booking_agent.calendar_owner_resolver._disambiguate_owner_with_llm')
     def test_resolve_calendar_owner_multiple_valid_owners_llm_failure(self, mock_llm, mock_lookup, mock_list):
         """Test when multiple valid owners exist but LLM cannot choose."""
-        mock_list.return_value = ["booking1@bhaang.com", "booking2@bhaang.com"]
+        mock_list.return_value = ["booking1.dev@bhaang.com", "booking2.dev@bhaang.com"]
         mock_lookup.return_value = {
-            "booking1@bhaang.com": {
+            "booking1.dev@bhaang.com": {
                 "user_id": "user1", 
-                "assist_email": "booking1@bhaang.com",
+                "assist_local": "booking1.dev",
                 "user_email": "sender@example.com"  # In conversation (from sample_parsed_email)
             },
-            "booking2@bhaang.com": {
+            "booking2.dev@bhaang.com": {
                 "user_id": "user2", 
-                "assist_email": "booking2@bhaang.com",
+                "assist_local": "booking2.dev",
                 "user_email": "other@example.com"  # In conversation (from sample_parsed_email)
             }
         }
@@ -280,7 +280,7 @@ class TestCalendarOwnerResolver(unittest.TestCase):
         result = resolve_calendar_owner(self.sample_parsed_email)
         
         self.assertEqual(result["status"], "multiple_owners_ambiguous")
-        self.assertEqual(result["candidates"], ["booking1@bhaang.com", "booking2@bhaang.com"])
+        self.assertEqual(result["candidates"], ["booking1.dev@bhaang.com", "booking2.dev@bhaang.com"])
         self.assertIn("LLM could not confidently choose", result["reason"])
     
     @patch('booking_agent.calendar_owner_resolver._list_booking_emails')
@@ -288,17 +288,17 @@ class TestCalendarOwnerResolver(unittest.TestCase):
     def test_resolve_calendar_owner_filter_invalid_emails(self, mock_lookup, mock_list):
         """Test that invalid booking emails are filtered out."""
         # Three booking emails in conversation
-        mock_list.return_value = ["booking1@bhaang.com", "booking2@bhaang.com", "booking3@bhaang.com"]
+        mock_list.return_value = ["booking1.dev@bhaang.com", "booking2.dev@bhaang.com", "booking3.dev@bhaang.com"]
         # But only two have valid owners
         mock_lookup.return_value = {
-            "booking1@bhaang.com": {
+            "booking1.dev@bhaang.com": {
                 "user_id": "user1", 
-                "assist_email": "booking1@bhaang.com",
+                "assist_local": "booking1.dev",
                 "user_email": "sender@example.com"  # In conversation (from sample_parsed_email)
             },
-            "booking2@bhaang.com": {
+            "booking2.dev@bhaang.com": {
                 "user_id": "user2", 
-                "assist_email": "booking2@bhaang.com",
+                "assist_local": "booking2.dev",
                 "user_email": "other@example.com"  # In conversation (from sample_parsed_email)
             }
         }
@@ -307,13 +307,13 @@ class TestCalendarOwnerResolver(unittest.TestCase):
         
         # Should proceed with only the valid emails
         self.assertEqual(result["status"], "multiple_owners_ambiguous")
-        self.assertEqual(result["candidates"], ["booking1@bhaang.com", "booking2@bhaang.com"])
+        self.assertEqual(result["candidates"], ["booking1.dev@bhaang.com", "booking2.dev@bhaang.com"])
     
     @patch('booking_agent.calendar_owner_resolver._list_booking_emails')
     @patch('booking_agent.calendar_owner_resolver._lookup_user_records')
     def test_resolve_calendar_owner_all_emails_invalid(self, mock_lookup, mock_list):
         """Test when all booking emails are invalid."""
-        mock_list.return_value = ["booking1@bhaang.com", "booking2@bhaang.com"]
+        mock_list.return_value = ["booking1.dev@bhaang.com", "booking2.dev@bhaang.com"]
         mock_lookup.return_value = {}  # No valid owners
         
         result = resolve_calendar_owner(self.sample_parsed_email)
@@ -325,21 +325,21 @@ class TestCalendarOwnerResolver(unittest.TestCase):
     @patch('booking_agent.calendar_owner_resolver._lookup_user_records')
     def test_resolve_calendar_owner_mixed_validity_and_conversation(self, mock_lookup, mock_list):
         """Test complex scenario with mixed validity and conversation presence."""
-        mock_list.return_value = ["booking1@bhaang.com", "booking2@bhaang.com", "booking3@bhaang.com"]
+        mock_list.return_value = ["booking1.dev@bhaang.com", "booking2.dev@bhaang.com", "booking3.dev@bhaang.com"]
         mock_lookup.return_value = {
-            "booking1@bhaang.com": {
+            "booking1.dev@bhaang.com": {
                 "user_id": "user1", 
-                "assist_email": "booking1@bhaang.com",
+                "assist_local": "booking1.dev",
                 "user_email": "sender@example.com"  # In conversation (from sample_parsed_email)
             },
-            "booking2@bhaang.com": {
+            "booking2.dev@bhaang.com": {
                 "user_id": "user2", 
-                "assist_email": "booking2@bhaang.com",
+                "assist_local": "booking2.dev",
                 "user_email": "alice@example.com"  # NOT in conversation
             },
-            "booking3@bhaang.com": {
+            "booking3.dev@bhaang.com": {
                 "user_id": "user3", 
-                "assist_email": "booking3@bhaang.com"
+                "assist_local": "booking3.dev"
                 # Missing user_email
             }
         }

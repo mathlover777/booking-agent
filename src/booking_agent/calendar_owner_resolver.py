@@ -6,6 +6,7 @@ from typing import List, Optional, Dict, Any
 from openai import OpenAI
 
 from common_utils import aws_utils
+from common_utils.email_helpers import to_local
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -52,10 +53,12 @@ def _lookup_user_records(agent_emails: List[str]) -> Dict[str, Dict[str, Any]]:
     results: Dict[str, Dict[str, Any]] = {}
     for addr in agent_emails:
         try:
+            # Convert full email to local part for database query
+            local_part = to_local(addr)
             resp = _user_email_table.query(
-                IndexName="assist_email-index",
-                KeyConditionExpression="assist_email = :email",
-                ExpressionAttributeValues={":email": addr}
+                IndexName="assist_local-index",
+                KeyConditionExpression="assist_local = :local",
+                ExpressionAttributeValues={":local": local_part}
             )
             if resp.get("Items"):
                 results[addr] = resp["Items"][0]

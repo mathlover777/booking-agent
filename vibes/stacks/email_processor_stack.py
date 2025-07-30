@@ -87,11 +87,11 @@ class EmailProcessorStack(Stack):
             point_in_time_recovery=True,
         )
 
-        # Add GSI for assist_email lookups
+        # Add GSI for assist_local lookups
         user_emails_table.add_global_secondary_index(
-            index_name="assist_email-index",
+            index_name="assist_local-index",
             partition_key=dynamodb.Attribute(
-                name="assist_email",
+                name="assist_local",
                 type=dynamodb.AttributeType.STRING
             ),
             projection_type=dynamodb.ProjectionType.ALL

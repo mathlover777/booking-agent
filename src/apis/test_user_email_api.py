@@ -136,7 +136,7 @@ def test_update_user_email():
             }
         },
         'body': json.dumps({
-            'assist_email': 'test@example.com'
+            'assist_local': 'test'
         })
     }
     
@@ -173,7 +173,7 @@ def test_check_email_availability():
             }
         },
         'body': json.dumps({
-            'assist_email': 'test@example.com'
+            'assist_local': 'test'
         })
     }
     
@@ -204,7 +204,7 @@ def test_check_email_availability():
             }
         },
         'body': json.dumps({
-            'assist_email': 'test@example.com'
+            'assist_local': 'test'
         })
     }
     
@@ -271,4 +271,5 @@ def test_jwt_authorizer():
 #     test_check_email_availability()
 #     test_jwt_authorizer()
     
-#     print("\nTests completed!") 
+#     print("\nTests completed!")
+

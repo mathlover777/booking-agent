@@ -4,6 +4,7 @@ import boto3
 import logging
 from datetime import datetime
 from typing import Dict, Any, Optional
+from common_utils.clerk_utils import get_user_primary_email
 
 from common_utils import aws_utils
 
@@ -12,6 +13,15 @@ logger = logging.getLogger(__name__)
 
 # Get table from aws_utils
 table = aws_utils.user_emails_table
+
+# Environment variables
+STAGE = os.getenv("STAGE", "dev").lower()
+
+def _add_stage_suffix(local_part: str) -> str:
+    """Add stage suffix to local part if not in production."""
+    if STAGE in {"prod", "production", "prd"}:
+        return local_part
+    return f"{local_part}.{STAGE}"
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -71,7 +81,8 @@ def get_user_email(user_id: str) -> Dict[str, Any]:
             },
             'body': json.dumps({
                 'user_id': user_id,
-                'assist_email': item.get('assist_email'),
+                'assist_local': item.get('assist_local'),
+                'user_email': item.get('user_email'),
                 'created_at': item.get('created_at'),
                 'updated_at': item.get('updated_at')
             })
@@ -89,28 +100,36 @@ def update_user_email(user_id: str, event: Dict[str, Any]) -> Dict[str, Any]:
     try:
         # Parse request body
         body = json.loads(event.get('body', '{}'))
-        assist_email = body.get('assist_email')
-        
-        if not assist_email:
-            return create_error_response(400, "assist_email is required")
-        
-        # Validate email format (basic validation)
-        if '@' not in assist_email or '.' not in assist_email:
-            return create_error_response(400, "Invalid email format")
-        
-        # Convert email to lowercase for case-insensitive storage and search
-        assist_email = assist_email.lower()
-        
+        assist_local = body.get('assist_local')
+
+        if not assist_local:
+            return create_error_response(400, "assist_local is required")
+
+        # Basic validation for local part
+        if not assist_local.strip() or len(assist_local.strip()) < 1:
+            return create_error_response(400, "Invalid assist_local format")
+
+        # Clean and normalize the local part, then add stage suffix
+        assist_local = assist_local.strip().lower()
+        assist_local = _add_stage_suffix(assist_local)
+
+        # Get user's primary email from Clerk
+        user_email = get_user_primary_email(user_id)
+        if not user_email:
+            logger.warning(f"Could not fetch primary email for user {user_id}, proceeding without it")
+            # Continue without user_email - it can be added later
+
+        # Prepare keys and timestamp
         pk = f"uid:{user_id}"
         sk = "data"
         now = datetime.utcnow().isoformat()
         
         # Check if email already exists for another user using GSI
         email_check_response = table.query(
-            IndexName="assist_email-index",
-            KeyConditionExpression="assist_email = :email",
+            IndexName="assist_local-index",
+            KeyConditionExpression="assist_local = :local",
             ExpressionAttributeValues={
-                ':email': assist_email
+                ':local': assist_local
             }
         )
         
@@ -137,30 +156,42 @@ def update_user_email(user_id: str, event: Dict[str, Any]) -> Dict[str, Any]:
         
         if existing_item:
             # Update existing user
+            update_expression = 'SET assist_local = :local, updated_at = :updated_at'
+            expression_values = {
+                ':local': assist_local,
+                ':updated_at': now
+            }
+            
+            # Add user_email to update if we have it
+            if user_email:
+                update_expression += ', user_email = :user_email'
+                expression_values[':user_email'] = user_email
+            
             response = table.update_item(
                 Key={
                     'pk': pk,
                     'sk': sk
                 },
-                UpdateExpression='SET assist_email = :email, updated_at = :updated_at',
-                ExpressionAttributeValues={
-                    ':email': assist_email,
-                    ':updated_at': now
-                },
+                UpdateExpression=update_expression,
+                ExpressionAttributeValues=expression_values,
                 ReturnValues='ALL_NEW'
             )
         else:
             # Create new user
-            response = table.put_item(
-                Item={
-                    'pk': pk,
-                    'sk': sk,
-                    'user_id': user_id,
-                    'assist_email': assist_email,
-                    'created_at': now,
-                    'updated_at': now
-                }
-            )
+            item_data = {
+                'pk': pk,
+                'sk': sk,
+                'user_id': user_id,
+                'assist_local': assist_local,
+                'created_at': now,
+                'updated_at': now
+            }
+            
+            # Add user_email if we have it
+            if user_email:
+                item_data['user_email'] = user_email
+            
+            response = table.put_item(Item=item_data)
             # For put_item, we need to get the item back
             response = table.get_item(
                 Key={
@@ -181,7 +212,8 @@ def update_user_email(user_id: str, event: Dict[str, Any]) -> Dict[str, Any]:
             },
             'body': json.dumps({
                 'user_id': user_id,
-                'assist_email': item.get('assist_email'),
+                'assist_local': item.get('assist_local'),
+                'user_email': item.get('user_email'),
                 'created_at': item.get('created_at'),
                 'updated_at': item.get('updated_at'),
                 'message': 'User email updated successfully'
@@ -202,24 +234,25 @@ def check_email_availability(user_id: str, event: Dict[str, Any]) -> Dict[str, A
     try:
         # Parse request body
         body = json.loads(event.get('body', '{}'))
-        assist_email = body.get('assist_email')
+        assist_local = body.get('assist_local')
         
-        if not assist_email:
-            return create_error_response(400, "assist_email is required")
+        if not assist_local:
+            return create_error_response(400, "assist_local is required")
         
-        # Validate email format (basic validation)
-        if '@' not in assist_email or '.' not in assist_email:
-            return create_error_response(400, "Invalid email format")
+        # Basic validation for local part
+        if not assist_local.strip() or len(assist_local.strip()) < 1:
+            return create_error_response(400, "Invalid assist_local format")
         
-        # Convert email to lowercase for case-insensitive search
-        assist_email = assist_email.lower()
+        # Clean and normalize the local part, then add stage suffix
+        assist_local = assist_local.strip().lower()
+        assist_local = _add_stage_suffix(assist_local)
         
         # Check if email already exists for another user using GSI
         email_check_response = table.query(
-            IndexName="assist_email-index",
-            KeyConditionExpression="assist_email = :email",
+            IndexName="assist_local-index",
+            KeyConditionExpression="assist_local = :local",
             ExpressionAttributeValues={
-                ':email': assist_email
+                ':local': assist_local
             }
         )
         
@@ -242,7 +275,7 @@ def check_email_availability(user_id: str, event: Dict[str, Any]) -> Dict[str, A
                 'Access-Control-Allow-Methods': 'GET,PUT,POST,OPTIONS'
             },
             'body': json.dumps({
-                'email': assist_email,
+                'assist_local': assist_local,
                 'available': is_available,
                 'message': 'Email is available' if is_available else 'Email is already in use by another user'
             })
