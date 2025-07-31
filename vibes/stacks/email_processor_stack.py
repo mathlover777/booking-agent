@@ -149,7 +149,7 @@ class EmailProcessorStack(Stack):
             handler="email_processor.lambda_handler",
             code=lambda_.Code.from_asset("src"),
             role=lambda_role,
-            timeout=Duration.seconds(30),
+            timeout=Duration.seconds(900),
             memory_size=256,
             layers=[common_layer],
             environment={

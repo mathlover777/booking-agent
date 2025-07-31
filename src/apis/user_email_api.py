@@ -14,16 +14,6 @@ logger = logging.getLogger(__name__)
 # Get table from aws_utils
 table = aws_utils.user_emails_table
 
-# Environment variables
-STAGE = os.getenv("STAGE", "dev").lower()
-
-def _add_stage_suffix(local_part: str) -> str:
-    """Add stage suffix to local part if not in production."""
-    if STAGE in {"prod", "production", "prd"}:
-        return local_part
-    return f"{local_part}.{STAGE}"
-
-
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     Lambda handler for user email API
@@ -109,9 +99,8 @@ def update_user_email(user_id: str, event: Dict[str, Any]) -> Dict[str, Any]:
         if not assist_local.strip() or len(assist_local.strip()) < 1:
             return create_error_response(400, "Invalid assist_local format")
 
-        # Clean and normalize the local part, then add stage suffix
+        # Clean and normalize the local part
         assist_local = assist_local.strip().lower()
-        assist_local = _add_stage_suffix(assist_local)
 
         # Get user's primary email from Clerk
         user_email = get_user_primary_email(user_id)
@@ -243,9 +232,8 @@ def check_email_availability(user_id: str, event: Dict[str, Any]) -> Dict[str, A
         if not assist_local.strip() or len(assist_local.strip()) < 1:
             return create_error_response(400, "Invalid assist_local format")
         
-        # Clean and normalize the local part, then add stage suffix
+        # Clean and normalize the local part
         assist_local = assist_local.strip().lower()
-        assist_local = _add_stage_suffix(assist_local)
         
         # Check if email already exists for another user using GSI
         email_check_response = table.query(

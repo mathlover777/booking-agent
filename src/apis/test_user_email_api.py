@@ -136,7 +136,7 @@ def test_update_user_email():
             }
         },
         'body': json.dumps({
-            'assist_local': 'test'
+            'assist_local': 'test.dev'
         })
     }
     
@@ -173,7 +173,7 @@ def test_check_email_availability():
             }
         },
         'body': json.dumps({
-            'assist_local': 'test'
+            'assist_local': 'test.dev'
         })
     }
     
@@ -204,7 +204,7 @@ def test_check_email_availability():
             }
         },
         'body': json.dumps({
-            'assist_local': 'test'
+            'assist_local': 'test.dev'
         })
     }
     
