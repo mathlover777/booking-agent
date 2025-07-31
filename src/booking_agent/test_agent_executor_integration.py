@@ -426,6 +426,131 @@ def test_case_4_cancel_event() -> str:
 
 
 # ---------------------------------------------------------------------------
+# Thread ID Tests -----------------------------------------------------------
+# ---------------------------------------------------------------------------
+
+def test_thread_id_usage():
+    """Test that thread_id is properly used for Langfuse session grouping."""
+    from unittest.mock import Mock, patch
+    
+    print(f"\n{'='*60}")
+    print("🧪 TEST: Thread ID Usage for Langfuse Session Grouping")
+    print(f"{'='*60}")
+    
+    # Test with existing thread_id
+    metadata_with_thread = {
+        "thread_id": "test-thread-123",
+        "subject": "Test Email",
+        "message_id": "test-message-456"
+    }
+    
+    print(f"📧 Testing with existing thread_id: {metadata_with_thread['thread_id']}")
+    
+    # Create a simple test email
+    parsed_email = _base_parsed_email(
+        "Test Thread ID",
+        "This is a test email for thread ID functionality.",
+        to=[BOOKING_EMAIL]
+    )
+    
+    # Mock the OpenAI client to capture metadata
+    with patch('booking_agent.agent_executor.OpenAI') as mock_openai_class:
+        mock_client = Mock()
+        mock_openai_class.return_value = mock_client
+        
+        # Mock the response
+        mock_response = Mock()
+        mock_response.choices = [Mock()]
+        mock_response.choices[0].message = Mock()
+        mock_response.choices[0].message.content = "Test response"
+        mock_response.choices[0].message.tool_calls = None
+        mock_client.chat.completions.create.return_value = mock_response
+        
+        # Run the booking agent
+        response = run_booking_agent(
+            parsed_email=parsed_email,
+            calendar_user_id=TEST_USER_ID,
+            booking_email=BOOKING_EMAIL,
+            metadata=metadata_with_thread
+        )
+        
+        # Verify that langfuse_session_id was set correctly
+        call_args = mock_client.chat.completions.create.call_args
+        call_metadata = call_args[1]['metadata']
+        
+        assert call_metadata['langfuse_session_id'] == "test-thread-123", f"Expected langfuse_session_id to be 'test-thread-123', got {call_metadata.get('langfuse_session_id')}"
+        assert call_metadata['thread_id'] == "test-thread-123", f"Expected thread_id to be 'test-thread-123', got {call_metadata.get('thread_id')}"
+        
+        print(f"✅ Thread ID properly used as langfuse_session_id")
+        print(f"✅ Metadata contains: {call_metadata}")
+
+
+def test_thread_id_generation():
+    """Test that a new thread_id is generated when not provided."""
+    from unittest.mock import Mock, patch
+    import uuid
+    
+    print(f"\n{'='*60}")
+    print("🧪 TEST: Thread ID Generation When Missing")
+    print(f"{'='*60}")
+    
+    # Test without thread_id in metadata
+    metadata_without_thread = {
+        "subject": "Test Email",
+        "message_id": "test-message-789"
+    }
+    
+    print(f"📧 Testing without thread_id in metadata")
+    
+    # Create a simple test email
+    parsed_email = _base_parsed_email(
+        "Test Thread ID Generation",
+        "This is a test email for thread ID generation.",
+        to=[BOOKING_EMAIL]
+    )
+    
+    # Mock the OpenAI client to capture metadata
+    with patch('booking_agent.agent_executor.OpenAI') as mock_openai_class:
+        mock_client = Mock()
+        mock_openai_class.return_value = mock_client
+        
+        # Mock the response
+        mock_response = Mock()
+        mock_response.choices = [Mock()]
+        mock_response.choices[0].message = Mock()
+        mock_response.choices[0].message.content = "Test response"
+        mock_response.choices[0].message.tool_calls = None
+        mock_client.chat.completions.create.return_value = mock_response
+        
+        # Run the booking agent
+        response = run_booking_agent(
+            parsed_email=parsed_email,
+            calendar_user_id=TEST_USER_ID,
+            booking_email=BOOKING_EMAIL,
+            metadata=metadata_without_thread
+        )
+        
+        # Verify that a new thread_id was generated and used
+        call_args = mock_client.chat.completions.create.call_args
+        call_metadata = call_args[1]['metadata']
+        
+        assert 'langfuse_session_id' in call_metadata, "Expected langfuse_session_id to be present in metadata"
+        assert call_metadata['langfuse_session_id'] is not None, "Expected langfuse_session_id to not be None"
+        assert len(call_metadata['langfuse_session_id']) > 0, "Expected langfuse_session_id to be a non-empty string"
+        
+        # Verify it's a valid UUID format
+        try:
+            uuid.UUID(call_metadata['langfuse_session_id'])
+            print(f"✅ Generated valid UUID thread_id: {call_metadata['langfuse_session_id']}")
+        except ValueError:
+            print(f"❌ Generated thread_id is not a valid UUID: {call_metadata['langfuse_session_id']}")
+            raise
+        
+        print(f"✅ Thread ID generation working correctly")
+        print(f"✅ Metadata contains: {call_metadata}")
+
+
+# ---------------------------------------------------------------------------
 # Allow execution via `python -m booking_agent.test_agent_executor_integration`
 # ---------------------------------------------------------------------------
 
@@ -438,5 +563,9 @@ if __name__ == "__main__":
     print(f"Booked event id: {test_id}")
     cancel_id = test_case_4_cancel_event()
     print(f"Cancelled event id: {cancel_id}")
+    
+    # Run thread ID tests
+    test_thread_id_usage()
+    test_thread_id_generation()
 
     print("\n✅ All agent-executor tests completed!") 

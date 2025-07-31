@@ -1,0 +1,7 @@
+---
+alwaysApply: true
+---
+If you want to run terminal commands to test
+- In this project in terminal activate virtualenv before running scripts source /Users/sourav/doc32/v2/.venv/bin/activate
+- Instead of python tests for integration test, create make file target in appropriate places and run those command
+- Makefile tests can be created in makefiles/testing

@@ -41,9 +41,14 @@ def parse_email_from_s3(s3_content: str) -> Dict[str, Any]:
     def parse_addresses(address_string: str) -> List[str]:
         if not address_string:
             return []
-        # Simple parsing - in production you'd want more robust parsing
-        addresses = [addr.strip() for addr in address_string.split(',')]
-        return addresses
+        # Parse addresses and extract clean email addresses
+        raw_addresses = [addr.strip() for addr in address_string.split(',')]
+        clean_addresses = []
+        for addr in raw_addresses:
+            clean_email = _extract_clean_email(addr)
+            if clean_email:
+                clean_addresses.append(clean_email)
+        return clean_addresses
     
     return {
         'subject': msg.get('Subject', ''),
@@ -138,32 +143,37 @@ def send_email_via_ses(
         } 
 
 
-def send_response_to_thread(parsed_email: Dict[str, Any], response_content: str, subject_override: str = None) -> Dict[str, Any]:
-    """Send response to all participants in the email thread (excluding sender)."""
+def send_response_to_thread(parsed_email: Dict[str, Any], response_content: str, subject_override: str = None, booking_email: str = None) -> Dict[str, Any]:
+    """Send response to all participants in the email thread (excluding sender and booking email)."""
     logger.info("Preparing to send response to thread")
     
-    # Get all participants from the email thread (excluding sender)
+    # Get all participants from the email thread (excluding sender and booking email)
     all_participants = []
-    sender_emails = set()
+    excluded_emails = set()
     
     # Get sender emails
     from_addresses = parsed_email.get('from', [])
     for email_addr in from_addresses:
         clean_email = _extract_clean_email(email_addr)
         if clean_email:
-            sender_emails.add(clean_email.lower())
+            excluded_emails.add(clean_email.lower())
     
-    # Add all recipients (to + cc) except sender
+    # Add booking email to excluded list if provided
+    if booking_email:
+        excluded_emails.add(booking_email.lower())
+        logger.info(f"Excluding booking email from recipients: {booking_email}")
+    
+    # Add all recipients (to + cc) except sender and booking email
     to_addresses = parsed_email.get('to', [])
     cc_addresses = parsed_email.get('cc', [])
     
     for email_addr in to_addresses + cc_addresses:
         clean_email = _extract_clean_email(email_addr)
-        if clean_email and clean_email.lower() not in sender_emails:
+        if clean_email and clean_email.lower() not in excluded_emails:
             all_participants.append(clean_email)
     
     if not all_participants:
-        return {'success': False, 'error': 'No valid recipients found (only sender in thread)'}
+        return {'success': False, 'error': 'No valid recipients found (only sender and booking email in thread)'}
     
     # Get threading information
     message_id = parsed_email.get('message_id', '')

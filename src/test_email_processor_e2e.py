@@ -29,6 +29,7 @@ load_dotenv('../.env.dev', override=True)
 
 # Set additional required environment variables
 os.environ['USER_EMAILS_TABLE_NAME'] = 'vibes-user-emails-dev'
+os.environ['DOMAIN_NAME'] = 'bhaang.com'  # Ensure domain filtering works correctly
 
 # Add current directory to path since we're now in src/
 sys.path.insert(0, '.')
@@ -484,6 +485,122 @@ def test_case_2_book_event_e2e():
             return None
 
 
+def test_case_3_domain_filter_e2e():
+    """Case 3: Domain filtering - email from same domain should be skipped"""
+    print("\n=== Case 3: Domain Filtering (Skip Same Domain) ===")
+    
+    # Create synthetic email content from the same domain
+    body = (
+        "Hi team,\n\n"
+        "This is an internal email from our domain that should be ignored.\n"
+        "The email processor should not process this and should not send any responses.\n\n"
+        "Best regards,\n"
+        "Internal Team"
+    )
+    
+    # Create synthetic email using template - FROM the domain
+    email_content = _create_synthetic_email(
+        from_name="Internal Team",
+        from_email="internal@bhaang.com",  # Same domain as DOMAIN_NAME
+        to_emails=["souravsarkar1729@gmail.com", "test.dev@bhaang.com"],
+        cc_emails=[],
+        subject="Internal communication",
+        body=body
+    )
+    
+    print(f"📧 From: internal@bhaang.com (same domain)")
+    print(f"📧 To: souravsarkar1729@gmail.com, test.dev@bhaang.com")
+    print(f"📝 Subject: Internal communication")
+    
+    print(f"\n📋 EXPECTED BEHAVIOR:")
+    print(f"   • Email should be uploaded to S3 (real)")
+    print(f"   • Lambda should be triggered")
+    print(f"   • Email should be parsed correctly")
+    print(f"   • Domain filter should detect email from bhaang.com")
+    print(f"   • Should return action: 'skipped'")
+    print(f"   • Should return reason: 'Email from internal@bhaang.com is from domain bhaang.com'")
+    print(f"   • NO agent processing should occur")
+    print(f"   • NO email sending should occur")
+    print(f"   • NO calendar operations should occur")
+    
+    # Upload to S3
+    s3_key = _upload_to_s3_test_bucket(email_content)
+    
+    if not s3_key:
+        print("❌ Failed to upload to S3, aborting test")
+        return None
+    
+    # Create Lambda event
+    event = _create_lambda_event("vibecal-test-bucket-dca839fhjo", s3_key)
+    
+    # Mock SES to ensure it's NOT called (domain filter should prevent this)
+    with patch('common_utils.email_util.send_email_via_ses') as mock_send_email:
+        mock_send_email.return_value = {
+            'success': True,
+            'message_id': 'mock-message-id-12345',
+            'response': {
+                'MessageId': 'mock-message-id-12345',
+                'ResponseMetadata': {
+                    'RequestId': 'mock-request-id',
+                    'HTTPStatusCode': 200
+                }
+            }
+        }
+        
+        print(f"\n🎯 Testing Lambda handler with event:")
+        print(json.dumps(event, indent=2))
+        
+        # Call the Lambda handler
+        try:
+            result = lambda_handler(event, {})
+            
+            print(f"\n✅ Lambda handler completed successfully!")
+            print(f"Status Code: {result.get('statusCode')}")
+            print(f"Response: {json.dumps(result.get('body', {}), indent=2)}")
+            
+            if result.get('statusCode') == 200:
+                response_body = json.loads(result.get('body', '{}'))
+                
+                if response_body.get('action') == 'skipped':
+                    print(f"✅ SUCCESS: Domain filtering worked correctly!")
+                    print(f"\n📋 VERIFICATION:")
+                    print(f"   • Action: {response_body.get('action')} ✅")
+                    print(f"   • Message: {response_body.get('message')} ✅")
+                    print(f"   • Reason: {response_body.get('reason')} ✅")
+                    print(f"   • SES was NOT called: {mock_send_email.call_count == 0} ✅")
+                    
+                    # Verify the reason contains the expected domain information
+                    expected_reason = "Email from internal@bhaang.com is from domain bhaang.com"
+                    if response_body.get('reason') == expected_reason:
+                        print(f"   • Reason matches expected: ✅")
+                    else:
+                        print(f"   • Reason mismatch: ❌")
+                        print(f"     Expected: {expected_reason}")
+                        print(f"     Got: {response_body.get('reason')}")
+                    
+                    print(f"\n🎉 DOMAIN FILTERING TEST PASSED!")
+                    print(f"   • Email from same domain was correctly skipped")
+                    print(f"   • No agent processing occurred")
+                    print(f"   • No email sending occurred")
+                    print(f"   • No calendar operations occurred")
+                    
+                else:
+                    print(f"❌ FAILED: Expected action 'skipped', got '{response_body.get('action')}'")
+                    print(f"   • This means the domain filter did not work correctly")
+                    print(f"   • The email should have been skipped but was processed instead")
+                    
+            else:
+                print(f"❌ FAILED: Lambda returned status {result.get('statusCode')}")
+            
+            return result
+            
+        except Exception as e:
+            print(f"\n❌ Lambda handler failed: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+
+
 # ---------------------------------------------------------------------------
 # Test runner functions ------------------------------------------------------
 # ---------------------------------------------------------------------------
@@ -498,6 +615,8 @@ def test_all_e2e_flows():
     test_case_1_share_availability_e2e()
     print("\n" + "="*80 + "\n")
     test_case_2_book_event_e2e()
+    print("\n" + "="*80 + "\n")
+    test_case_3_domain_filter_e2e()
     
     print("\n✅ All end-to-end email processor pipeline tests completed!")
 

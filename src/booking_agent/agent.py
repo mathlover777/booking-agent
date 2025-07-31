@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from common_utils import aws_utils
 from .calendar_owner_resolver import resolve_calendar_owner
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 _secrets = aws_utils._secrets
 
 
-def process_booking_request(parsed_email: Dict[str, Any]) -> Dict[str, Any]:
+def process_booking_request(parsed_email: Dict[str, Any], metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     Process a booking request from parsed email data.
     
@@ -21,6 +21,7 @@ def process_booking_request(parsed_email: Dict[str, Any]) -> Dict[str, Any]:
     
     Args:
         parsed_email: Parsed email data from parse_email_from_s3
+        metadata: Optional metadata for Langfuse tracing
     
     Returns:
         Dict with processing result:
@@ -37,7 +38,7 @@ def process_booking_request(parsed_email: Dict[str, Any]) -> Dict[str, Any]:
     
     # Resolve calendar owner
     logger.info("Resolving calendar owner")
-    owner_resolution = resolve_calendar_owner(parsed_email)
+    owner_resolution = resolve_calendar_owner(parsed_email, metadata)
     logger.info(f"Owner resolution status: {owner_resolution.get('status')}")
     
     # Handle unsuccessful resolution
@@ -108,7 +109,8 @@ def process_booking_request(parsed_email: Dict[str, Any]) -> Dict[str, Any]:
     ai_response = run_booking_agent(
         parsed_email=parsed_email,
         calendar_user_id=calendar_user_id,
-        booking_email=booking_email
+        booking_email=booking_email,
+        metadata=metadata
     )
     
     logger.info("Booking agent completed successfully")

@@ -1,4 +1,4 @@
-.PHONY: test-agent-exec-availability test-agent-exec-availability-range test-agent-exec-book test-agent-exec-cancel test-agent-exec-all
+.PHONY: test-agent-exec-availability test-agent-exec-availability-range test-agent-exec-book test-agent-exec-cancel test-agent-exec-thread-id test-agent-exec-thread-id-gen test-agent-exec-all
 
 # ---------------------------------------------------------------------------
 # Agent-executor integration tests
@@ -19,6 +19,14 @@ test-agent-exec-book: ## Test booking an event
 test-agent-exec-cancel: ## Test cancelling an event
 	@echo "Testing agent-executor – cancel event..."
 	cd src && python -c "from booking_agent.test_agent_executor_integration import test_case_4_cancel_event as t; t()"
+
+test-agent-exec-thread-id: ## Test thread ID usage for Langfuse session grouping
+	@echo "Testing agent-executor – thread ID usage..."
+	cd src && python -c "from booking_agent.test_agent_executor_integration import test_thread_id_usage as t; t()"
+
+test-agent-exec-thread-id-gen: ## Test thread ID generation when missing
+	@echo "Testing agent-executor – thread ID generation..."
+	cd src && python -c "from booking_agent.test_agent_executor_integration import test_thread_id_generation as t; t()"
 
 test-agent-exec-all: ## Run all agent-executor tests in sequence
 	@echo "Running ALL agent-executor tests..."

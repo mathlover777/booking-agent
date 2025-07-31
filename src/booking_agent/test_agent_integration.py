@@ -113,7 +113,7 @@ def test_case_1_no_booking_agents_found():
     print(f"   • Should return clarification_needed action")
     print(f"   • Should provide helpful message about including booking agent")
     
-    result = process_booking_request(parsed_email)
+    result = process_booking_request(parsed_email, metadata={"test_case": "no_booking_agents_found"})
     print(f"\nResult: {result}")
     
     if result["action"] == "clarification_needed" and result["status"] == "no_booking_agents_found":
@@ -158,7 +158,7 @@ def test_case_2_booking_agent_not_registered():
     print(f"   • Should return clarification_needed action")
     print(f"   • Should provide helpful message about setup")
     
-    result = process_booking_request(parsed_email)
+    result = process_booking_request(parsed_email, metadata={"test_case": "booking_agent_not_registered"})
     print(f"\nResult: {result}")
     
     if result["action"] == "clarification_needed" and result["status"] == "booking_agent_not_registered":
@@ -211,7 +211,7 @@ def test_case_3_calendar_owner_not_in_conversation():
         print(f"   • Should return clarification_needed action")
         print(f"   • Should provide helpful message about including user")
         
-        result = process_booking_request(parsed_email)
+        result = process_booking_request(parsed_email, metadata={"test_case": "calendar_owner_not_in_conversation"})
         print(f"\nResult: {result}")
         
         if result["action"] == "clarification_needed" and result["status"] == "calendar_owner_not_in_conversation":
@@ -285,7 +285,7 @@ def test_case_4_missing_user_email_field():
         print(f"   • Should return clarification_needed action")
         print(f"   • Should provide helpful message about configuration")
         
-        result = process_booking_request(parsed_email)
+        result = process_booking_request(parsed_email, metadata={"test_case": "missing_user_email_field"})
         print(f"\nResult: {result}")
         
         if result["action"] == "clarification_needed" and result["status"] == "user_email_missing":
@@ -356,7 +356,7 @@ def test_case_5_share_availability():
     print(f"   • Response should end with 'By VibeCal'")
     print(f"   • Response should be sent to John Doe")
     
-    result = process_booking_request(parsed_email)
+    result = process_booking_request(parsed_email, metadata={"test_case": "share_availability"})
     print(f"\nResult: {result}")
     
     if result["action"] == "processed":
@@ -449,7 +449,7 @@ def test_case_6_book_event():
     print(f"   • Response should include 'Event ID: [some-id]'")
     print(f"   • Response should end with 'By VibeCal'")
     
-    result = process_booking_request(parsed_email)
+    result = process_booking_request(parsed_email, metadata={"test_case": "book_event"})
     print(f"\nResult: {result}")
     
     if result["action"] == "processed":
@@ -584,7 +584,7 @@ def test_case_7_cancel_event():
     print(f"   • Response should end with 'By VibeCal'")
     print(f"   • Event should no longer exist in Google Calendar")
     
-    result = process_booking_request(parsed_email)
+    result = process_booking_request(parsed_email, metadata={"test_case": "cancel_event"})
     print(f"\nResult: {result}")
     
     if result["action"] == "processed":
@@ -714,7 +714,7 @@ def test_case_8_multiple_agents_llm_disambiguation():
         print(f"   • Should use LLM to disambiguate based on email content")
         print(f"   • Should either succeed or return clarification_needed")
         
-        result = process_booking_request(parsed_email)
+        result = process_booking_request(parsed_email, metadata={"test_case": "multiple_agents_llm_disambiguation"})
         print(f"\nResult: {result}")
         
         if result["action"] == "processed":

@@ -2,8 +2,9 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 import os
 import json
+import uuid
 
-from openai import OpenAI
+from langfuse.openai import OpenAI
 
 from calendar_utils.calendar_tools import (
     CalendarAssistant,
@@ -70,7 +71,8 @@ def run_ai_agent_loop(
     user_message: str,
     tools: List[Dict[str, Any]],
     tool_executor: callable,
-    max_iterations: int = 10
+    max_iterations: int = 10,
+    metadata: Optional[Dict[str, Any]] = None
 ) -> str:
     """
     Generic AI agent loop that can be used with any tool set and executor.
@@ -82,6 +84,7 @@ def run_ai_agent_loop(
         tools: List of tool definitions
         tool_executor: Function that executes tools (tool_name, tool_args) -> result
         max_iterations: Maximum number of AI iterations
+        metadata: Optional metadata for Langfuse tracing
     
     Returns:
         Final AI response content
@@ -91,14 +94,30 @@ def run_ai_agent_loop(
         {"role": "user", "content": user_message},
     ]
 
+    # Generate or use existing thread ID for Langfuse session grouping
+    thread_id = metadata.get('thread_id') if metadata else None
+    if not thread_id:
+        thread_id = str(uuid.uuid4())
+        print(f"🤖 [DEBUG] Generated new thread ID: {thread_id}")
+
     for iteration in range(max_iterations):
         print(f"🤖 [DEBUG] AI iteration {iteration + 1}")
 
+        # Add iteration-specific metadata
+        call_metadata = metadata.copy() if metadata else {}
+        call_metadata.update({
+            "iteration": iteration + 1,
+            "max_iterations": max_iterations,
+            "langfuse_session_id": thread_id  # Group all messages in this thread
+        })
+
         response = client.chat.completions.create(
+            name="booking-agent-iteration",
             model="gpt-4o",
             messages=messages,
             tools=tools,
             tool_choice="auto",
+            metadata=call_metadata,
         )
 
         assistant_message = response.choices[0].message
@@ -140,6 +159,7 @@ def run_booking_agent(
     calendar_user_id: str,
     booking_email: str,
     max_iterations: int = 10,
+    metadata: Optional[Dict[str, Any]] = None,
 ) -> str:
     """Run the booking-agent AI loop for a single e-mail thread.
 
@@ -154,6 +174,8 @@ def run_booking_agent(
         The concierge address representing the agent.
     max_iterations : int
         Safety cap for LLM <-> tool loop.
+    metadata : dict, optional
+        Metadata for Langfuse tracing.
 
     Returns
     -------
@@ -201,6 +223,7 @@ def run_booking_agent(
         tools=tools,
         tool_executor=_tool_executor,
         max_iterations=max_iterations,
+        metadata=metadata,
     )
 
     # Check for successful operations and append confirmation details

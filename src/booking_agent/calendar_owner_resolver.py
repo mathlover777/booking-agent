@@ -3,7 +3,7 @@ import json
 import re
 import logging
 from typing import List, Optional, Dict, Any
-from openai import OpenAI
+from langfuse.openai import OpenAI
 
 from common_utils import aws_utils
 from common_utils.email_helpers import to_local
@@ -80,7 +80,7 @@ def _is_user_in_conversation(user_email: str, parsed_email: Dict[str, Any]) -> b
     return user_email.lower() in conversation_emails
 
 
-def _disambiguate_owner_with_llm(parsed_email: Dict[str, Any], candidate_emails: List[str]) -> Optional[str]:
+def _disambiguate_owner_with_llm(parsed_email: Dict[str, Any], candidate_emails: List[str], metadata: Optional[Dict[str, Any]] = None) -> Optional[str]:
     """Use LLM to pick correct booking agent when >1 mapping found.
     Returns chosen booking-agent email or None if not confident."""
     try:
@@ -105,10 +105,26 @@ def _disambiguate_owner_with_llm(parsed_email: Dict[str, Any], candidate_emails:
                 })
             )
         }
+        
+        # Add disambiguation-specific metadata with thread ID for session grouping
+        call_metadata = metadata.copy() if metadata else {}
+        call_metadata.update({
+            "stage": "calendar_owner_disambiguation",
+            "candidate_count": len(candidate_emails),
+            "candidates": candidate_emails
+        })
+        
+        # Use thread_id as langfuse_session_id if available
+        thread_id = metadata.get('thread_id') if metadata else None
+        if thread_id:
+            call_metadata["langfuse_session_id"] = thread_id
+        
         response = client.chat.completions.create(
+            name="calendar-owner-disambiguation",
             model="gpt-4o",
             messages=[system_msg, user_msg],
-            response_format={"type": "json_object"}
+            response_format={"type": "json_object"},
+            metadata=call_metadata,
         )
         raw_content = response.choices[0].message.content
         data = json.loads(raw_content)
@@ -120,7 +136,7 @@ def _disambiguate_owner_with_llm(parsed_email: Dict[str, Any], candidate_emails:
         return None
 
 
-def resolve_calendar_owner(parsed_email: Dict[str, Any]) -> Dict[str, Any]:
+def resolve_calendar_owner(parsed_email: Dict[str, Any], metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     Determine which user's calendar to use with security checks.
     
@@ -208,7 +224,7 @@ def resolve_calendar_owner(parsed_email: Dict[str, Any]) -> Dict[str, Any]:
     
     # Step 9: If multiple valid owners in conversation -> use LLM to disambiguate
     logger.info(f"Multiple valid owners in conversation: {owners_in_conversation}, using LLM to disambiguate")
-    chosen = _disambiguate_owner_with_llm(parsed_email, owners_in_conversation)
+    chosen = _disambiguate_owner_with_llm(parsed_email, owners_in_conversation, metadata)
     
     if chosen and chosen in records:
         return {

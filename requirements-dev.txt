@@ -2,3 +2,4 @@ aws-cdk-lib
 constructs
 pytest
 python-dotenv
+ruff
