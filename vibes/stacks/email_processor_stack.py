@@ -156,7 +156,7 @@ class EmailProcessorStack(Stack):
             environment={
                 "LOG_LEVEL": "INFO",
                 "STAGE": stage,
-                "BOOKING_EMAIL": os.getenv('BOOKING_EMAIL'),
+                "BACKUP_BOOKING_EMAIL": os.getenv('BACKUP_BOOKING_EMAIL'),
                 "USER_EMAILS_TABLE_NAME": user_emails_table.table_name,
                 "DOMAIN_NAME": os.getenv('DOMAIN_NAME')
             }
