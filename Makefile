@@ -12,6 +12,7 @@ include makefiles/testing/api-tests.mk
 include makefiles/testing/agent-executor-tests.mk
 include makefiles/testing/agent-tests.mk
 include makefiles/testing/email-processor-tests.mk
+include makefiles/testing/logging-tests.mk
 
 # Default target
 .DEFAULT_GOAL := help 

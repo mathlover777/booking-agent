@@ -13,6 +13,10 @@ from calendar_utils.calendar_tools import (
 )
 
 from common_utils import aws_utils
+from common_utils.log_util import get_logger
+
+# Get logger for this module
+logger = get_logger(__name__)
 
 # Get secrets
 _secrets = aws_utils._secrets

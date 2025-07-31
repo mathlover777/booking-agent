@@ -1,13 +1,13 @@
 import json
 import boto3
-import logging
 import os
 from common_utils.email_util import parse_email_from_s3, send_email_via_ses, send_response_to_thread
 from booking_agent.agent import process_booking_request
+from common_utils.log_util import get_logger
 from typing import Dict, Any
 
-# Configure logging
-logger = logging.getLogger(__name__)
+# Get logger for this module
+logger = get_logger(__name__)
 
 # Get domain name from environment
 DOMAIN_NAME = os.getenv("DOMAIN_NAME")
@@ -57,41 +57,51 @@ def lambda_handler(event, context):
     """
     Lambda handler for processing emails stored in S3
     """
-    logger.info("Email processor lambda triggered")
+    logger.info("=" * 80)
+    logger.info("🚀 EMAIL PROCESSOR LAMBDA TRIGGERED")
+    logger.info("=" * 80)
     logger.info(f"Event: {json.dumps(event)}")
     
     # Get S3 bucket and key from the event
     s3_bucket = event['Records'][0]['s3']['bucket']['name']
     s3_key = event['Records'][0]['s3']['object']['key']
     
-    logger.info(f"Processing email from S3: {s3_bucket}/{s3_key}")
+    logger.info(f"📧 Processing email from S3: {s3_bucket}/{s3_key}")
     
     try:
-        # Load and parse email from S3
-        email_content = load_email_from_s3(s3_bucket, s3_key)
-        parsed_email = parse_email_from_s3(email_content)
-        logger.info(f"Parsed email with keys: {list(parsed_email.keys())}")
+        logger.info("🔍 Starting email processing...")
         
-        # Check if email is from the domain to prevent loops
+        # Load and parse email from S3
+        logger.info("📥 Loading email from S3...")
+        email_content = load_email_from_s3(s3_bucket, s3_key)
+        logger.info(f"📥 Email content loaded, length: {len(email_content)} characters")
+        
+        logger.info("🔍 Parsing email content...")
+        parsed_email = parse_email_from_s3(email_content)
+        logger.info(f"✅ Email parsed successfully with keys: {list(parsed_email.keys())}")
+        
+        # Check if email is from bhaang domain - if so, exit doing nothing
         from_emails = parsed_email.get('from', [])
         if DOMAIN_NAME and from_emails:
             for from_email in from_emails:
                 if from_email.lower().endswith(f"@{DOMAIN_NAME.lower()}"):
-                    logger.info(f"Skipping email from domain {DOMAIN_NAME}: {from_email}")
+                    logger.info(f"Skipping email from bhaang domain {DOMAIN_NAME}: {from_email}")
                     return {
                         'statusCode': 200,
                         'body': json.dumps({
-                            'message': 'Email skipped - from domain address',
+                            'message': f'Email skipped - from {DOMAIN_NAME} domain',
                             'action': 'skipped',
                             'reason': f'Email from {from_email} is from domain {DOMAIN_NAME}'
                         })
                     }
         
         # Create metadata for Langfuse tracing
+        logger.info("🔍 Creating Langfuse metadata...")
         metadata = create_langfuse_metadata(parsed_email, s3_bucket, s3_key)
-        logger.info(f"Created Langfuse metadata: {metadata}")
+        logger.info(f"✅ Created Langfuse metadata: {metadata}")
         
-        # Process booking request with parsed email data and metadata
+        # Run the agent loop
+        logger.info("🤖 Starting AI booking agent processing...")
         result = process_booking_request(parsed_email, metadata)
         
         logger.info("=" * 80)
@@ -102,7 +112,7 @@ def lambda_handler(event, context):
         
         # Handle different actions from the agent
         if result['action'] == 'processed':
-            # Send AI response to thread
+            # Send AI response to thread from booking email
             send_result = send_response_to_thread(parsed_email, result['ai_response'], booking_email=result['booking_email'])
             
             if send_result.get("success"):
@@ -131,11 +141,11 @@ def lambda_handler(event, context):
                 }
                 
         elif result['action'] == 'clarification_needed':
-            # Send clarification email to all participants except sender
+            # Send clarification email from booking email to all participants except booking email and bhaang domain emails
             send_result = send_response_to_thread(
                 parsed_email, 
                 result['clarification_message'],
-                subject_override="Calendar Booking - Need Clarification"
+                booking_email=result.get('booking_email')
             )
             
             if send_result.get("success"):
@@ -173,7 +183,11 @@ def lambda_handler(event, context):
             }
             
     except Exception as e:
-        logger.error(f"Error in lambda handler: {e}", exc_info=True)
+        logger.error("=" * 80)
+        logger.error("❌ ERROR IN EMAIL PROCESSOR LAMBDA")
+        logger.error("=" * 80)
+        logger.error(f"Error details: {e}", exc_info=True)
+        logger.error("=" * 80)
         return {
             'statusCode': 500,
             'body': json.dumps({

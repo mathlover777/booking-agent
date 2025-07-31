@@ -1,12 +1,12 @@
-import logging
 from typing import Dict, Any, Optional
 
 from common_utils import aws_utils
+from common_utils.log_util import get_logger
 from .calendar_owner_resolver import resolve_calendar_owner
 from .agent_executor import run_booking_agent
 
-# Configure logging
-logger = logging.getLogger(__name__)
+# Get logger for this module
+logger = get_logger(__name__)
 
 # Get secrets
 _secrets = aws_utils._secrets

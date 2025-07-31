@@ -2,22 +2,25 @@ import json
 import email
 import os
 import boto3
-import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
 from typing import Dict, List, Any
 import re
+from .log_util import get_logger
 
-# Configure logging
-logger = logging.getLogger(__name__)
+# Get logger for this module
+logger = get_logger(__name__)
 
 
 def parse_email_from_s3(s3_content: str) -> Dict[str, Any]:
     """
     Parse email content from S3 and extract relevant information
     """
+    logger.info("🔍 Starting email parsing...")
+    logger.info(f"📧 Email content length: {len(s3_content)} characters")
+    
     # Parse the email message
     msg = email.message_from_string(s3_content)
     
@@ -50,7 +53,7 @@ def parse_email_from_s3(s3_content: str) -> Dict[str, Any]:
                 clean_addresses.append(clean_email)
         return clean_addresses
     
-    return {
+    parsed_result = {
         'subject': msg.get('Subject', ''),
         'body': body,
         'from': parse_addresses(from_address),
@@ -63,6 +66,15 @@ def parse_email_from_s3(s3_content: str) -> Dict[str, Any]:
         'references': msg.get('References', ''),
         'return_path': msg.get('Return-Path', '')
     }
+    
+    logger.info(f"✅ Email parsing completed")
+    logger.info(f"📧 Subject: {parsed_result['subject']}")
+    logger.info(f"👤 From: {parsed_result['from']}")
+    logger.info(f"📬 To: {parsed_result['to']}")
+    logger.info(f"📋 CC: {parsed_result['cc']}")
+    logger.info(f"📄 Body length: {len(parsed_result['body'])} characters")
+    
+    return parsed_result
 
 
 def send_email_via_ses(
@@ -92,7 +104,7 @@ def send_email_via_ses(
         Dict with SES response
     """
     if from_address is None:
-        from_address = os.getenv('BOOKING_EMAIL', 'bookdev@bhaang.com')
+        from_address = os.getenv('BACKUP_BOOKING_EMAIL', 'bookdev@bhaang.com')
     
     # Create SES client
     ses_client = boto3.client('ses', region_name=region)
@@ -193,6 +205,7 @@ def send_response_to_thread(parsed_email: Dict[str, Any], response_content: str,
         to_addresses=all_participants,
         subject=subject,
         body=response_content,
+        from_address=booking_email,  # Use the resolved booking email as sender
         reply_to_message_id=message_id,
         reply_to_references=references
     )

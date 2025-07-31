@@ -1,13 +1,13 @@
 import json
 import os
 import requests
-import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone, timedelta
 import pytz
 from urllib.parse import quote
 
 from common_utils import aws_utils
+from common_utils.log_util import get_logger
 
 # Global variables
 _secrets = aws_utils._secrets
@@ -15,8 +15,8 @@ _secrets = aws_utils._secrets
 # Google Calendar API base URL
 GOOGLE_CALENDAR_API_BASE = "https://www.googleapis.com/calendar/v3"
 
-# Configure logging
-logger = logging.getLogger(__name__)
+# Get logger for this module
+logger = get_logger(__name__)
 
 def get_google_oauth_token_low_level(user_id: str) -> Optional[str]:
     """Retrieve Google OAuth token for a user from Clerk API"""

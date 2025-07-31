@@ -106,8 +106,9 @@ class EmailProcessorStack(Stack):
             ]
         )
 
-        # Add S3 read permissions to the lambda role
+        # Add S3 read and delete permissions to the lambda role
         email_bucket.grant_read(lambda_role)
+        email_bucket.grant_delete(lambda_role)
 
         # Add DynamoDB permissions to the lambda role
         user_emails_table.grant_read_write_data(lambda_role)
@@ -156,7 +157,8 @@ class EmailProcessorStack(Stack):
                 "LOG_LEVEL": "INFO",
                 "STAGE": stage,
                 "BOOKING_EMAIL": os.getenv('BOOKING_EMAIL'),
-                "USER_EMAILS_TABLE_NAME": user_emails_table.table_name
+                "USER_EMAILS_TABLE_NAME": user_emails_table.table_name,
+                "DOMAIN_NAME": os.getenv('DOMAIN_NAME')
             }
         )
 

@@ -601,6 +601,153 @@ def test_case_3_domain_filter_e2e():
             return None
 
 
+def test_case_4_real_email_processing():
+    """Case 4: Process real email from sample/real1 - investigate agent email mapping"""
+    print("\n=== Case 4: Real Email Processing (sample/real1) ===")
+    
+    # Read the real email content from the sample file
+    real_email_path = os.path.join(os.path.dirname(__file__), '..', 'sample', 'real1')
+    
+    try:
+        with open(real_email_path, 'r', encoding='utf-8') as f:
+            real_email_content = f.read()
+        print(f"✅ Loaded real email from: {real_email_path}")
+    except Exception as e:
+        print(f"❌ Failed to load real email: {e}")
+        return None
+    
+    # Parse the email to understand its structure
+    print(f"\n📧 EMAIL ANALYSIS:")
+    print(f"   • File size: {len(real_email_content)} characters")
+    
+    # Extract key information from the email
+    lines = real_email_content.split('\n')
+    from_line = None
+    to_line = None
+    subject_line = None
+    
+    for line in lines:
+        if line.startswith('From: '):
+            from_line = line
+        elif line.startswith('To: '):
+            to_line = line
+        elif line.startswith('Subject: '):
+            subject_line = line
+    
+    print(f"   • From: {from_line}")
+    print(f"   • To: {to_line}")
+    print(f"   • Subject: {subject_line}")
+    
+    # Check if the email contains the expected agent email
+    expected_agent = "test.dev@bhaang.com"
+    if expected_agent in real_email_content:
+        print(f"   • ✅ Contains expected agent: {expected_agent}")
+    else:
+        print(f"   • ❌ Missing expected agent: {expected_agent}")
+    
+    # Check for any other bhaang.com emails that might be causing confusion
+    import re
+    bhaang_emails = re.findall(r'[a-zA-Z0-9._%+-]+@bhaang\.com', real_email_content)
+    print(f"   • All bhaang.com emails found: {bhaang_emails}")
+    
+    # Setup DynamoDB test data to ensure correct mapping
+    test_agent_email = expected_agent
+    _setup_test_user(test_agent_email, TEST_USER_EMAIL, TEST_USER_ID)
+    
+    print(f"\n📋 EXPECTED BEHAVIOR:")
+    print(f"   • Email should be uploaded to S3 (real)")
+    print(f"   • Lambda should be triggered")
+    print(f"   • Email should be parsed correctly")
+    print(f"   • Agent should resolve to: {test_agent_email}")
+    print(f"   • Should recognize 'help book call' request")
+    print(f"   • Should ask for clarification about booking details")
+    print(f"   • Response should end with 'By VibeCal'")
+    print(f"   • SES should be called to send response (mocked)")
+    
+    # Upload to S3
+    s3_key = _upload_to_s3_test_bucket(real_email_content)
+    
+    if not s3_key:
+        print("❌ Failed to upload to S3, aborting test")
+        return None
+    
+    # Create Lambda event
+    event = _create_lambda_event("vibecal-test-bucket-dca839fhjo", s3_key)
+    
+    # Mock only the SES send_raw_email function to prevent actual email sending
+    with patch('common_utils.email_util.send_email_via_ses') as mock_send_email:
+        mock_send_email.return_value = {
+            'success': True,
+            'message_id': 'mock-message-id-12345',
+            'response': {
+                'MessageId': 'mock-message-id-12345',
+                'ResponseMetadata': {
+                    'RequestId': 'mock-request-id',
+                    'HTTPStatusCode': 200
+                }
+            }
+        }
+        
+        print(f"\n🎯 Testing Lambda handler with real email event:")
+        print(json.dumps(event, indent=2))
+        
+        # Call the Lambda handler
+        try:
+            result = lambda_handler(event, {})
+            
+            print(f"\n✅ Lambda handler completed successfully!")
+            print(f"Status Code: {result.get('statusCode')}")
+            print(f"Response: {json.dumps(result.get('body', {}), indent=2)}")
+            
+            if result.get('statusCode') == 200:
+                print(f"✅ SUCCESS: Real email processed successfully")
+                response_body = json.loads(result.get('body', '{}'))
+                
+                print(f"\n📋 VERIFICATION:")
+                print(f"   • Action: {response_body.get('action')}")
+                print(f"   • Calendar User ID: {response_body.get('calendar_user_id')}")
+                print(f"   • Booking Email: {response_body.get('booking_email')}")
+                
+                # Check if the correct agent email was used
+                if response_body.get('booking_email') == expected_agent:
+                    print(f"   • ✅ Correct agent email used: {expected_agent}")
+                else:
+                    print(f"   • ❌ Wrong agent email used: {response_body.get('booking_email')}")
+                    print(f"   • Expected: {expected_agent}")
+                
+                if response_body.get('action') == 'processed':
+                    print(f"📧 AI Response:")
+                    print(f"{'─'*60}")
+                    print(response_body.get('ai_response', ''))
+                    print(f"{'─'*60}")
+                    print(f"   • Response contains 'By VibeCal': {'By VibeCal' in response_body.get('ai_response', '')}")
+                else:
+                    print(f"⚠️  Agent returned: {response_body.get('action')}")
+                    if response_body.get('clarification_message'):
+                        print(f"📧 Clarification message:")
+                        print(f"{'─'*60}")
+                        print(response_body.get('clarification_message'))
+                        print(f"{'─'*60}")
+                
+                # Additional debugging for agent email resolution
+                print(f"\n🔍 AGENT EMAIL RESOLUTION DEBUG:")
+                print(f"   • User ID from DynamoDB: {TEST_USER_ID}")
+                print(f"   • User Email: {TEST_USER_EMAIL}")
+                print(f"   • Expected Agent: {expected_agent}")
+                print(f"   • Actual Agent Used: {response_body.get('booking_email')}")
+                
+            else:
+                print(f"❌ FAILED: Lambda returned status {result.get('statusCode')}")
+            
+            return result
+            
+        except Exception as e:
+            print(f"\n❌ Lambda handler failed: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+
+
 # ---------------------------------------------------------------------------
 # Test runner functions ------------------------------------------------------
 # ---------------------------------------------------------------------------
@@ -617,6 +764,8 @@ def test_all_e2e_flows():
     test_case_2_book_event_e2e()
     print("\n" + "="*80 + "\n")
     test_case_3_domain_filter_e2e()
+    print("\n" + "="*80 + "\n")
+    test_case_4_real_email_processing()
     
     print("\n✅ All end-to-end email processor pipeline tests completed!")
 

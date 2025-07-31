@@ -1,15 +1,15 @@
 import os
 import json
 import re
-import logging
 from typing import List, Optional, Dict, Any
 from langfuse.openai import OpenAI
 
 from common_utils import aws_utils
 from common_utils.email_helpers import to_local
+from common_utils.log_util import get_logger
 
-# Configure logging
-logger = logging.getLogger(__name__)
+# Get logger for this module
+logger = get_logger(__name__)
 
 # Get secrets
 _secrets = aws_utils._secrets

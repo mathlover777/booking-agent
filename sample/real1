@@ -1,0 +1,74 @@
+Return-Path: <souravsarkar1729@gmail.com>
+Received: from mail-yb1-f181.google.com (mail-yb1-f181.google.com [209.85.219.181])
+ by inbound-smtp.ap-south-1.amazonaws.com with SMTP id 037pa04h45d325ivdp9cm3ivkd1ec2ap3a0haao1
+ for test.dev@bhaang.com;
+ Thu, 31 Jul 2025 13:10:49 +0000 (UTC)
+X-SES-Spam-Verdict: PASS
+X-SES-Virus-Verdict: PASS
+Received-SPF: pass (spfCheck: domain of _spf.google.com designates 209.85.219.181 as permitted sender) client-ip=209.85.219.181; envelope-from=souravsarkar1729@gmail.com; helo=mail-yb1-f181.google.com;
+Authentication-Results: amazonses.com;
+ spf=pass (spfCheck: domain of _spf.google.com designates 209.85.219.181 as permitted sender) client-ip=209.85.219.181; envelope-from=souravsarkar1729@gmail.com; helo=mail-yb1-f181.google.com;
+ dkim=pass header.i=@gmail.com;
+ dmarc=pass header.from=gmail.com;
+X-SES-RECEIPT: AEFBQUFBQUFBQUFHa0ZCVTc0S2NvZ2tHRTFnT1VIMEVyZTVGWGttZk1FL0sxaTFXK0d6dmlUMXZmTEc5aWVmYVlRV0pnUDY1ZnAzZmN5djZVbXd2SnNvUVM3ejlMRzgydTB3Ujdrb1VJTHpGL05JdjRMUVpWWVJYYVlhaFN2SDZ4M2V3TjRmWm92WUptdW1SMTBnOGRuZ0JYL0xRYUNKVk0xc3ZrN215cHZOYzhRdnVDOExJMEV1SjRwUmpVMDBOekZvY0g4alVBQmU2a2xBZ0hxREUxcHoza0dyWDF2ZEorT1ptZTNKRnFwa2swZFQ3a2hMdDNWd2o0aVFpWmRRT2RsVUpBempzNXJka3M2K1oxN2RWRXZ0OThhdVZqSk9KM3UvT082VUgxSTBsSDdqNkY0UzFkSHc9PQ==
+X-SES-DKIM-SIGNATURE: a=rsa-sha256; q=dns/txt; b=XUY9JWRjGCJwMzVS2zxbruooWivdD7W+OrnNGcUw70WV7arQqnAaBXIpQAmuh0WZ8aBiiYyVVS+bKYejPIV2RprzPRCvBDysN1leWBOVhFqmKxM8r/6rZbYUvPrD9Gd9XEn/X36VE6+hy5kCnd48QMLzEflNvKq6cszVXHAvVZE=; c=relaxed/simple; s=dvogjbaa3ou3tduyzvyu4rj5tkuzdi4h; d=amazonses.com; t=1753967449; v=1; bh=9Cvm7aKSqhMozfzHijjI6v09i0I458elQBBqt+xloXY=; h=From:To:Cc:Bcc:Subject:Date:Message-ID:MIME-Version:Content-Type:X-SES-RECEIPT;
+Received: by mail-yb1-f181.google.com with SMTP id 3f1490d57ef6-e8ebd470b69so973950276.1
+        for <test.dev@bhaang.com>; Thu, 31 Jul 2025 06:10:48 -0700 (PDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=gmail.com; s=20230601; t=1753967446; x=1754572246; darn=bhaang.com;
+        h=to:subject:message-id:date:from:mime-version:from:to:cc:subject
+         :date:message-id:reply-to;
+        bh=9Cvm7aKSqhMozfzHijjI6v09i0I458elQBBqt+xloXY=;
+        b=P4M6m9aQG6aD8zeHCK++E36h4NiKaiHpMshdee4hf+IpFKy83zaQjcZVjMiBI9YETE
+         K0IUUMM0eZjKWT80aOR1zlgRIsHSHEhaGHfj1YE2e6rOibyaSCiOc4bBIUUdHi8ZiZg/
+         T0m2152Dg3Y4htISZzvX72pYRMXPF/0mETe7LtRp8CQW8PClhDbeRVi+5Ichkix7geLQ
+         YREvvXfzwPHUmb2X/muaa2CuVuSX77SNVglZRlnYXi8gGXU4/61pGq8ESv4EJxg7zBeq
+         31glw0DaOT1rrWXCAFm4+foJ+XQHq3/QJxo8mNyt8JBbThi1rJGfwAoZqqelQQShBCW8
+         oqgQ==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=1e100.net; s=20230601; t=1753967446; x=1754572246;
+        h=to:subject:message-id:date:from:mime-version:x-gm-message-state
+         :from:to:cc:subject:date:message-id:reply-to;
+        bh=9Cvm7aKSqhMozfzHijjI6v09i0I458elQBBqt+xloXY=;
+        b=kzkXmngNXtCufHF9KO6NExucpQZ6cHbCjkcQeXjxU4DK3Cw0S1feutDZCqbGmO0mBG
+         lRfNvQ6el2j/3Qfw/i65KJB0Zb9CYNvQJRnzdOIlJDcVIL6cM6VGeJ+5ep9fU1NG+8RI
+         wAqxq4ToT/DkJdwnU82/FsIslyIyNFpD83jUqA9w7XhKu8abJCntuT6LzYiCQrjxfCF0
+         C9uUJBxKpTdECVxHrUCqw8Cg6oUg4Mz0K+iAqFKEUrxI7janF/DuHZ7kHSMO9du6L0e4
+         0zX1CEZ2FWKXTXidLDBXpZtzoOJA0niDiv2pI7uxwaAUdhd0piDHNBC4HKqjN89Jlr+m
+         3htQ==
+X-Forwarded-Encrypted: i=1; AJvYcCVVIW45E2vdoPrU7a/nKuEqc5jcQiYDMybZu7YR+H30pxlhNRjIKd+tquq5OcYo9BVY/ojYKgCBOg==@bhaang.com
+X-Gm-Message-State: AOJu0Yzki7sZt/sRb/DVDqYCLNAGVjA7d/iezbAL/uZ34Tt0TwamIGoB
+	iI7xyBqHv+zAc+u1YjIei+PRpWIt8S5a3aetEEsBTFev9ZBiUcDsxUGJAIp2Fdy/wiei/vFJ59v
+	bB+y9IKNFr0fluBuGbs5nAlNFvrUz9bFG3mrC
+X-Gm-Gg: ASbGncvYeoNd+ipThs0r8ZxUKoz2/i9zI9ilhPo8zw15jXqVgDg6ESq8SBVKG4kWxJq
+	MI1Rio71ISTcxHKRoYBzDTsUjVzO/KyYgBsmymhSY/X26q+d8MBRQJtm9usWFi8PnBLk5U1yNuW
+	2795gsM2aIjUWwo4dtSWdz0eI0dJkaH81rAQznB+GqBDzd6AITuXfVO0F0Wh5Aw8vPGuAliJ2HO
+	qulVwPB1anggBxidBCes7MuUxmy9sL0QUJQAN7e8AOFcWlncMw=
+X-Google-Smtp-Source: AGHT+IEIPJV3Icu2HIEoySyeUuadeQjtr4r+NgrScGYRGqYxtWMH7pdRY9aIt2CPPfJdvhDYoz11XN+XS0O3HYtEf8I=
+X-Received: by 2002:a05:6902:18ce:b0:e8f:d6f7:9dfa with SMTP id
+ 3f1490d57ef6-e8fd6f79ff8mr1610742276.8.1753967445837; Thu, 31 Jul 2025
+ 06:10:45 -0700 (PDT)
+MIME-Version: 1.0
+From: Sourav Sarkar <souravsarkar1729@gmail.com>
+Date: Thu, 31 Jul 2025 17:10:34 +0400
+X-Gm-Features: Ac12FXzgSQOK0jThwaaKB7mIzOY6r0nn6aNc0A0eNq5iGLReaEqIRIWQr5WVb14
+Message-ID: <CABu2_87PBGvtWW6hXKSo0Z=6bL0FL8rpu40czjCHgy-uPNvZDA@mail.gmail.com>
+Subject: book call
+To: Sourav Sarkar <souravmathlover@gmail.com>, test.dev@bhaang.com
+Content-Type: multipart/alternative; boundary="0000000000008e8ae5063b395e0b"
+X-SES-RECEIPT-RULE: email-processor-dev
+
+--0000000000008e8ae5063b395e0b
+Content-Type: text/plain; charset="UTF-8"
+
+@test.dev@bhaang.com <test.dev@bhaang.com> help book call
+
+--0000000000008e8ae5063b395e0b
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<div dir=3D"ltr"><a class=3D"gmail_plusreply" id=3D"plusReplyChip-3" href=
+=3D"mailto:test.dev@bhaang.com" tabindex=3D"-1">@test.dev@bhaang.com</a>=C2=
+=A0help book call<br></div>
+
+--0000000000008e8ae5063b395e0b--

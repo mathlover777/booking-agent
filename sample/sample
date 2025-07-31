@@ -1,0 +1,60 @@
+Return-Path: <0109019860431f4d-a8c42b4a-4d0f-4540-8986-7672bc21d15e-000000@ap-south-1.amazonses.com>
+Received: from c180-36.smtp-out.ap-south-1.amazonses.com (c180-36.smtp-out.ap-south-1.amazonses.com [76.223.180.36])
+ by inbound-smtp.ap-south-1.amazonaws.com with SMTP id 0co5lcadhjski5e866rni5m9a6o19urj8et2s401;
+ Thu, 31 Jul 2025 11:34:28 +0000 (UTC)
+X-SES-Spam-Verdict: PASS
+X-SES-Virus-Verdict: PASS
+Received-SPF: pass (spfCheck: domain of ap-south-1.amazonses.com designates 76.223.180.36 as permitted sender) client-ip=76.223.180.36; envelope-from=0109019860431f4d-a8c42b4a-4d0f-4540-8986-7672bc21d15e-000000@ap-south-1.amazonses.com; helo=c180-36.smtp-out.ap-south-1.amazonses.com;
+Authentication-Results: amazonses.com;
+ spf=pass (spfCheck: domain of ap-south-1.amazonses.com designates 76.223.180.36 as permitted sender) client-ip=76.223.180.36; envelope-from=0109019860431f4d-a8c42b4a-4d0f-4540-8986-7672bc21d15e-000000@ap-south-1.amazonses.com; helo=c180-36.smtp-out.ap-south-1.amazonses.com;
+ dkim=pass header.i=@amazonses.com;
+ dkim=pass header.i=@bhaang.com;
+ dmarc=none header.from=bhaang.com;
+X-SES-RECEIPT: AEFBQUFBQUFBQUFGMVNIeW1Zakl5YWl1WVZyNnNlSVN2c2o1VndJdFl1cDI5aE12bVQ2SlNBRHV1SkN6QXJEL0czekU2RkRkcSsxSy9OTmZOL0NteHR1aUhDSytSa2ZrN2NGRHh5YzVyMHh5cm44b2t1Q2FhQTRtREV1Rm93amJhcE9MU0owdVNUTmVnM3JxQlpBYzNkQURyN2FtYzlSWnVWVEdFSWNpclJYcjVibTBIcXhCY1E5THA4T2toTWlkN2RQS0syTTl6S3F6M3JWeEpnMmlDRm8wc0hYS3Y1SE1NSnRHMzk0d3MwYm5UZ1VLZVNUK3BnTkh4UmIyS1pyaEpHcStVNTF3MTBlcDVnai9xRHdCM3doT2NHOGM3OTdQZVVHbkZRb1cwS1ZVcHFCSVdJSjVvU0wrdG5YZFA3ck5ZZGcrUnM5ZmorQmVBdytDcllHbHJ6NEJFMnBWbk51REdiVEdneERydjNVMUdLTy9GVjhVZEVZaC8wMk85YXRHQTBvWDZjOEdTZjJFPQ==
+X-SES-DKIM-SIGNATURE: a=rsa-sha256; q=dns/txt; b=o35UtYeXR496dwxgK/NWnKMWCrdhOx4fe1cyxn6xvk1RYtAFwvHlh7B+ixu5bB3V9ljaNoMzZ6lpbaWlQSCSVuCZHRCiXU52w0RWmIj//OoZqtHsR3hl1cQ4pfSpGbOpfsPhwKTRUGrO5s32fjPTwBAYEK68Nsf1V79fYSQHP0c=; c=relaxed/simple; s=dvogjbaa3ou3tduyzvyu4rj5tkuzdi4h; d=amazonses.com; t=1753961668; v=1; bh=MPu/pg0Mh+SLKVQyCAwiVhRowHsj5RBXfHo8gVFedpE=; h=From:To:Cc:Bcc:Subject:Date:Message-ID:MIME-Version:Content-Type:X-SES-RECEIPT;
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/simple;
+	s=eq4e3eustqjzle7jgttfmszw72d5ylgc; d=bhaang.com; t=1753961668;
+	h=Content-Type:MIME-Version:From:To:Subject:In-Reply-To:References:Message-ID:Date;
+	bh=MPu/pg0Mh+SLKVQyCAwiVhRowHsj5RBXfHo8gVFedpE=;
+	b=NybmnQ9rIBNRRaDOd4o38yUhCO8Xxrax7gTAq8zJOGzuMtVnTwUOH1YjyR0o3BRL
+	z8pIYMkBAYlJQQfAuWjFkDpBfkaP9LaLgcQSllrlRlkm08wwLyUj+AnBCtWN8Fu2pYP
+	uhGGpgSdLgqpy4aJdF0aZEmuJc1rK0VcEhtwAxc6akyHaa/PVISLDGTt6hW4gECP67w
+	/I6qNkp9pCJWFwTOf75HBCWvrLAPwuTNqtsLIj/eqi7lFmwUq+mQssgNJnvvao0tryq
+	n/mNh4cpPDYXYIJOF5H3PWGWZKejAkC8P+drDnSMoZiROO3gyiT8bm1SdTp2Kbx39+9
+	iRATIN/ORA==
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/simple;
+	s=dvogjbaa3ou3tduyzvyu4rj5tkuzdi4h; d=amazonses.com; t=1753961668;
+	h=Content-Type:MIME-Version:From:To:Subject:In-Reply-To:References:Message-ID:Date:Feedback-ID;
+	bh=MPu/pg0Mh+SLKVQyCAwiVhRowHsj5RBXfHo8gVFedpE=;
+	b=G42OFopAnll03bECH0iOCW9pU0tqwz8YL8HcKGACLNFKuWUimJOcs47NcauhRDIb
+	SKkjucO8z0Jd+K6xnLJ4XMzNdp24kdpgcDq1mAwp1iodylIJB8bR3D46svFQwzRVFSN
+	x/FQ+diFK827vXhhxfeHTQP1g3kgnfhQ6L3IunVI=
+Content-Type: multipart/mixed; boundary="===============5153321857927094715=="
+MIME-Version: 1.0
+From: bookdev@bhaang.com
+To: bookdev@bhaang.com, bookdev@bhaang.com, bookdev@bhaang.com, 
+	bookdev@bhaang.com, bookdev@bhaang.com, bookdev@bhaang.com, 
+	bookdev@bhaang.com, bookdev@bhaang.com, bookdev@bhaang.com, 
+	bookdev@bhaang.com, bookdev@bhaang.com, bookdev@bhaang.com, 
+	bookdev@bhaang.com, bookdev@bhaang.com, souravsarkar1729@gmail.com, 
+	souravmathlover@gmail.com, test.dev@bhaang.com
+Subject: Calendar Booking - Need Clarification
+In-Reply-To: <01090198604318fd-21c7ed04-fa86-454a-bd66-cc7583361b0d-000000@ap-south-1.amazonses.com>
+References: <CABu2_87BLkqDoxjXhXDg4KJDCpq6TY0AyHUt8h1hDXGm=d0DnA@mail.gmail.com> <010901986042bc7c-e2caf1a6-3a26-4e62-827a-c955582e52cc-000000@ap-south-1.amazonses.com> <010901986042c4e8-df4ed95d-95ed-44f4-ac79-86f04cca987f-000000@ap-south-1.amazonses.com> <010901986042cc80-f84bcf6d-a19e-4d88-811b-9a18867cb4b5-000000@ap-south-1.amazonses.com> <010901986042d2fd-f9b8bc63-eb96-44ba-8a28-9511c9e33c4b-000000@ap-south-1.amazonses.com> <010901986042dc48-622285af-d8bd-4111-9461-fd49039141b4-000000@ap-south-1.amazonses.com> <010901986042e360-85070e55-4e14-4bfc-bd62-80e97f585f6e-000000@ap-south-1.amazonses.com> <010901986042ea8f-0b4dfc2a-9810-4921-a71f-1680a06f21ca-000000@ap-south-1.amazonses.com> <010901986042f0af-9c0ae559-1bb0-433d-85f2-e33a154914f5-000000@ap-south-1.amazonses.com> <010901986042f7d7-09cfb50d-f3c1-4be9-b8cb-8b85ad4475ab-000000@ap-south-1.amazonses.com> <010901986042fe51-2eace485-b413-4589-87c8-d67274bc215b-000000@ap-south-1.amazonses.com> <01090198604304b9-a465b0f7-f5b3-4f0b-88ca-53ed7129073a-000000@ap-south-1.amazonses.com> <0109019860430b54-ae0ca6ca-69af-4bd3-a5ea-94c97542795e-000000@ap-south-1.amazonses.com> <0109019860431259-f6713a72-1ea3-433c-9b71-df5aac66839a-000000@ap-south-1.amazonses.com> <01090198604318fd-21c7ed04-fa86-454a-bd66-cc7583361b0d-000000@ap-south-1.amazonses.com>
+Message-ID: <0109019860431f4d-a8c42b4a-4d0f-4540-8986-7672bc21d15e-000000@ap-south-1.amazonses.com>
+Date: Thu, 31 Jul 2025 11:34:28 +0000
+Feedback-ID: ::1.ap-south-1.V3DcLEPrI7RCCGvPvtpTJBSbPSi4x03SI5bBi7bUeTg=:AmazonSES
+X-SES-Outgoing: 2025.07.31-76.223.180.36
+X-SES-RECEIPT-RULE: email-processor-dev
+
+--===============5153321857927094715==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+
+Hello,
+
+I couldn't find any booking agent addresses in this conversation. Please make sure to include a booking agent email address.
+
+By VibeCal
+--===============5153321857927094715==--

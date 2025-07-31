@@ -1,14 +1,24 @@
 import json
 import boto3
 import os
-import logging
+from .log_util import get_logger
+
+# Get logger for this module
+logger = get_logger(__name__)
 
 # Global variables
 STAGE = os.getenv('STAGE')
-print(f"STAGE: {STAGE}")
-secrets_client = boto3.client('secretsmanager')
-response = secrets_client.get_secret_value(SecretId=f"{STAGE}/vibecal")
-_secrets = json.loads(response['SecretString'])
+logger.info(f"STAGE: {STAGE}")
+
+try:
+    secrets_client = boto3.client('secretsmanager')
+    response = secrets_client.get_secret_value(SecretId=f"{STAGE}/vibecal")
+    _secrets = json.loads(response['SecretString'])
+    logger.info("✅ Successfully loaded secrets from AWS Secrets Manager")
+except Exception as e:
+    logger.error(f"❌ Failed to load secrets from AWS Secrets Manager: {e}")
+    # Initialize with empty dict to prevent import errors
+    _secrets = {}
 
 # Initialize Langfuse environment variables from secrets
 def _init_langfuse():
@@ -31,10 +41,3 @@ _init_langfuse()
 dynamodb = boto3.resource('dynamodb')
 user_emails_table_name = os.getenv('USER_EMAILS_TABLE_NAME')
 user_emails_table = dynamodb.Table(user_emails_table_name) if user_emails_table_name else None
-
-# Configure logging globally
-log_level = os.getenv('LOG_LEVEL', 'INFO')
-logging.basicConfig(
-    level=getattr(logging, log_level.upper()),
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)

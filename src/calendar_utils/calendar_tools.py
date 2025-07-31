@@ -1,5 +1,9 @@
 from typing import List, Optional, Dict, Any
 from .calendar_util import get_availability_low_level, book_event_low_level, cancel_event_low_level, get_event_low_level
+from common_utils.log_util import get_logger
+
+# Get logger for this module
+logger = get_logger(__name__)
 
 
 class CalendarAssistant:

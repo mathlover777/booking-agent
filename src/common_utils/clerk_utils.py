@@ -1,9 +1,9 @@
 import requests
-import logging
 from typing import Dict, Any, Optional
 from .aws_utils import _secrets
+from .log_util import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 def get_user_info(user_id: str) -> Optional[Dict[str, Any]]:
     """
