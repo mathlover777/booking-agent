@@ -1,7 +1,6 @@
 import os
 from dotenv import load_dotenv
 from aws_cdk import (
-    Duration,
     Stack,
     RemovalPolicy,
     aws_s3 as s3,
@@ -24,7 +23,7 @@ class CommonStack(Stack):
     - ReceiptRuleSet
     - S3 Bucket
     - Route53 records
-    - Lambda Layer (shared dependencies)
+    - Lambda Layers (shared dependencies and auth)
     """
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
@@ -55,15 +54,27 @@ class CommonStack(Stack):
             )
         )
 
-        # Create Lambda Layer with shared dependencies
-        self.lambda_layer = lambda_.LayerVersion(
-            self, "VibesDependenciesLayer",
-            layer_version_name="vibes-dependencies",
-            description="Shared dependencies for Vibes Lambda functions",
-            code=lambda_.Code.from_asset("lambda-layer"),
+        # Create Lambda Layer with common dependencies
+        self.common_layer = lambda_.LayerVersion(
+            self, "VibesCommonLayer",
+            layer_version_name="vibes-common-dependencies",
+            description="Common dependencies for Vibes Lambda functions",
+            code=lambda_.Code.from_asset("lambda-layer/common"),
             compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
             removal_policy=RemovalPolicy.RETAIN,
         )
+
+        # Create Lambda Layer with auth dependencies
+        self.auth_layer = lambda_.LayerVersion(
+            self, "VibesAuthLayer",
+            layer_version_name="vibes-auth-dependencies",
+            description="Authentication dependencies for Vibes Lambda functions",
+            code=lambda_.Code.from_asset("lambda-layer/auth"),
+            compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
+            removal_policy=RemovalPolicy.RETAIN,
+        )
+
+
 
         # Import existing hosted zone for bhaang.com
         hosted_zone = route53.HostedZone.from_lookup(
@@ -109,4 +120,5 @@ class CommonStack(Stack):
         CfnOutput(self, "SESDomainName", value=os.getenv('DOMAIN_NAME'))
         CfnOutput(self, "ReceiptRuleSetName", value=self.ses_receipt_rule_set.receipt_rule_set_name)
         CfnOutput(self, "HostedZoneId", value=hosted_zone.hosted_zone_id)
-        CfnOutput(self, "LambdaLayerArn", value=self.lambda_layer.layer_version_arn, export_name="VibesCommonStackLambdaLayerArn") 
+        CfnOutput(self, "CommonLayerArn", value=self.common_layer.layer_version_arn, export_name="VibesCommonStackCommonLayerArn")
+        CfnOutput(self, "AuthLayerArn", value=self.auth_layer.layer_version_arn, export_name="VibesCommonStackAuthLayerArn") 

@@ -2,12 +2,16 @@ import json
 import email
 import os
 import boto3
+import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
 from typing import Dict, List, Any
 import re
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 
 def parse_email_from_s3(s3_content: str) -> Dict[str, Any]:
@@ -132,3 +136,81 @@ def send_email_via_ses(
             'error': str(e),
             'response': None
         } 
+
+
+def send_response_to_thread(parsed_email: Dict[str, Any], response_content: str, subject_override: str = None) -> Dict[str, Any]:
+    """Send response to all participants in the email thread (excluding sender)."""
+    logger.info("Preparing to send response to thread")
+    
+    # Get all participants from the email thread (excluding sender)
+    all_participants = []
+    sender_emails = set()
+    
+    # Get sender emails
+    from_addresses = parsed_email.get('from', [])
+    for email_addr in from_addresses:
+        clean_email = _extract_clean_email(email_addr)
+        if clean_email:
+            sender_emails.add(clean_email.lower())
+    
+    # Add all recipients (to + cc) except sender
+    to_addresses = parsed_email.get('to', [])
+    cc_addresses = parsed_email.get('cc', [])
+    
+    for email_addr in to_addresses + cc_addresses:
+        clean_email = _extract_clean_email(email_addr)
+        if clean_email and clean_email.lower() not in sender_emails:
+            all_participants.append(clean_email)
+    
+    if not all_participants:
+        return {'success': False, 'error': 'No valid recipients found (only sender in thread)'}
+    
+    # Get threading information
+    message_id = parsed_email.get('message_id', '')
+    references = parsed_email.get('references', '')
+    
+    # If this is a reply, add the current message ID to references
+    if message_id and references:
+        references = f"{references} {message_id}"
+    elif message_id:
+        references = message_id
+    
+    # Determine subject
+    if subject_override:
+        subject = subject_override
+    else:
+        subject = parsed_email.get('subject', '')
+        if not subject.lower().startswith('re:'):
+            subject = f"Re: {subject}"
+    
+    logger.info(f"Sending response to {len(all_participants)} participants")
+    
+    return send_email_via_ses(
+        to_addresses=all_participants,
+        subject=subject,
+        body=response_content,
+        reply_to_message_id=message_id,
+        reply_to_references=references
+    )
+
+
+def _extract_clean_email(email_addr: str) -> str:
+    """Extract clean email address from various formats."""
+    if not email_addr:
+        return None
+    
+    # Remove angle brackets if present
+    email_addr = email_addr.strip()
+    if email_addr.startswith('<') and email_addr.endswith('>'):
+        email_addr = email_addr[1:-1]
+    
+    # Extract email from "Name <email@domain.com>" format
+    match = re.search(r'<(.+?)>', email_addr)
+    if match:
+        return match.group(1).strip()
+    
+    # If it looks like a valid email, return as is
+    if '@' in email_addr:
+        return email_addr.strip()
+    
+    return None 
