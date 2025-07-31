@@ -144,36 +144,30 @@ def send_email_via_ses(
 
 
 def send_response_to_thread(parsed_email: Dict[str, Any], response_content: str, subject_override: str = None, booking_email: str = None) -> Dict[str, Any]:
-    """Send response to all participants in the email thread (excluding sender and booking email)."""
+    """Send response to all participants in the email thread (excluding only the booking email)."""
     logger.info("Preparing to send response to thread")
     
-    # Get all participants from the email thread (excluding sender and booking email)
+    # Get all participants from the email thread (excluding only the booking email)
     all_participants = []
     excluded_emails = set()
-    
-    # Get sender emails
-    from_addresses = parsed_email.get('from', [])
-    for email_addr in from_addresses:
-        clean_email = _extract_clean_email(email_addr)
-        if clean_email:
-            excluded_emails.add(clean_email.lower())
     
     # Add booking email to excluded list if provided
     if booking_email:
         excluded_emails.add(booking_email.lower())
         logger.info(f"Excluding booking email from recipients: {booking_email}")
     
-    # Add all recipients (to + cc) except sender and booking email
+    # Add all participants (sender + to + cc) except booking email
+    from_addresses = parsed_email.get('from', [])
     to_addresses = parsed_email.get('to', [])
     cc_addresses = parsed_email.get('cc', [])
     
-    for email_addr in to_addresses + cc_addresses:
+    for email_addr in from_addresses + to_addresses + cc_addresses:
         clean_email = _extract_clean_email(email_addr)
         if clean_email and clean_email.lower() not in excluded_emails:
             all_participants.append(clean_email)
     
     if not all_participants:
-        return {'success': False, 'error': 'No valid recipients found (only sender and booking email in thread)'}
+        return {'success': False, 'error': 'No valid recipients found (only booking email in thread)'}
     
     # Get threading information
     message_id = parsed_email.get('message_id', '')
