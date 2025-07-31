@@ -425,6 +425,192 @@ def test_case_4_cancel_event() -> str:
     return event_id
 
 
+def test_case_5_slot_conflict_handling() -> str:
+    """Case 5 – Test slot conflict handling when user tries to book an occupied time."""
+    meeting_date = (datetime.now() + timedelta(days=5)).strftime("%Y-%m-%d")
+    start_time = "16:00"  # Use a time that's likely to be available
+    end_time = "17:00"
+    conflicting_title = f"AI-Conflict-Test {uuid.uuid4().hex[:4]}"
+    
+    # First, create a conflicting event directly via the calendar assistant
+    calendar_assistant = CalendarAssistant(TEST_USER_ID)
+    conflicting_event = calendar_assistant.book_event(
+        date=meeting_date,
+        start_time=start_time,
+        end_time=end_time,
+        title=conflicting_title,
+        attendees=[TEST_USER_EMAIL],
+    )
+    
+    # Handle the case where booking fails due to conflict
+    if conflicting_event.get('error') == 'slot_not_available':
+        # There's already a conflict, get the event ID from availability data
+        availability = calendar_assistant.get_availability(meeting_date, meeting_date)
+        for event in availability.get('events', []):
+            event_start = event.get('start')
+            event_end = event.get('end')
+            
+            # Handle both string and dict formats
+            if isinstance(event_start, str):
+                event_start_str = event_start
+            elif isinstance(event_start, dict):
+                event_start_str = event_start.get('dateTime', '')
+            else:
+                event_start_str = ''
+                
+            if isinstance(event_end, str):
+                event_end_str = event_end
+            elif isinstance(event_end, dict):
+                event_end_str = event_end.get('dateTime', '')
+            else:
+                event_end_str = ''
+            
+            # Check if this event overlaps with our target time
+            if event_start_str and event_end_str:
+                if (f"{meeting_date}T{start_time}:00" < event_end_str and 
+                    f"{meeting_date}T{end_time}:00" > event_start_str):
+                    conflicting_event_id = event.get('id')
+                    conflicting_title = event.get('title', event.get('summary', 'Unknown Event'))
+                    break
+        else:
+            conflicting_event_id = 'unknown'
+            conflicting_title = 'Unknown Event'
+        print(f"Using existing conflicting event at {meeting_date} {start_time}-{end_time}")
+    else:
+        conflicting_event_id = conflicting_event["event_id"]
+        print(f"Created conflicting event {conflicting_event_id} at {meeting_date} {start_time}-{end_time}")
+
+    print(f"\n{'='*60}")
+    print("🧪 TEST CASE 5: Slot Conflict Handling")
+    print(f"{'='*60}")
+    print(f"📅 Meeting date: {meeting_date}")
+    print(f"⏰ Conflicting time: {start_time}-{end_time}")
+    print(f"📝 Conflicting title: {conflicting_title}")
+    print(f"🆔 Conflicting Event ID: {conflicting_event_id}")
+    print(f"👤 User: {TEST_USER_EMAIL}")
+    print(f"🤖 Agent: {BOOKING_EMAIL}")
+    print(f"📧 From: Sarah Wilson (trying to book conflicting slot)")
+    print(f"\n📋 EXPECTED BEHAVIOR:")
+    print(f"   • Agent should recognize Sarah's request to book the {start_time} slot")
+    print(f"   • Agent should detect that {start_time}-{end_time} is already occupied")
+    print(f"   • Agent should inform Sarah that the slot is not available")
+    print(f"   • Agent should show available slots for {meeting_date}")
+    print(f"   • Response should end with 'By VibeCal'")
+    print(f"   • Should NOT create a new event (no double booking)")
+    print(f"{'='*60}")
+
+    # Compose email asking the agent to book the conflicting slot
+    body = (
+        f"@{BOOKING_EMAIL} please book {meeting_date} {start_time}-{end_time} for 'Project Discussion'\n\n"
+        f"On Thu, 10 Jul 2025 at 11:30, Sarah Wilson <sarah.wilson@company.com> wrote:\n"
+        f"> Hi Sourav,\n>\n"
+        f"> I'd like to schedule a project discussion meeting for {meeting_date} at {start_time}-{end_time}.\n"
+        f"> Please go ahead and book that time slot.\n>\n"
+        f"> Thanks,\n"
+        f"> Sarah\n>\n"
+        f"> On Thu, 10 Jul 2025 at 10:45, {BOOKING_EMAIL} wrote:\n"
+        f">> Hi Sarah,\n>>\n"
+        f">> Here are Sourav's available slots for {meeting_date}:\n>>\n"
+        f">> - {meeting_date} 09:00-10:00\n"
+        f">> - {meeting_date} 10:00-11:00\n"
+        f">> - {meeting_date} 14:00-15:00\n"
+        f">> - {meeting_date} 16:00-17:00\n>>\n"
+        f">> Let me know which time works best for you!\n>>\n"
+        f">> By VibeCal\n>\n"
+        f"> On Thu, 10 Jul 2025 at 10:20, Sarah Wilson <sarah.wilson@company.com> wrote:\n"
+        f">> Hi Sourav,\n>>\n"
+        f">> I need to schedule a project discussion meeting. Could you please share your\n"
+        f">> availability for {meeting_date}?\n>>\n"
+        f">> Best regards,\n"
+        f">> Sarah\n>\n"
+        f"> On Thu, 10 Jul 2025 at 10:15, {TEST_USER_EMAIL} wrote:\n"
+        f">> Hi Sarah,\n>>\n"
+        f">> I'll have my assistant check my calendar and share my availability.\n>>\n"
+        f">> Thanks,\n"
+        f">> Sourav"
+    )
+    
+    # Sarah is trying to book a conflicting slot
+    parsed_email = _base_parsed_email(
+        "Re: Project Discussion Booking", 
+        body,
+        to=[TEST_USER_EMAIL, BOOKING_EMAIL],
+        cc=[]
+    )
+    parsed_email["from"] = ["sarah.wilson@company.com"]
+
+    response = run_booking_agent(
+        parsed_email=parsed_email,
+        calendar_user_id=TEST_USER_ID,
+        booking_email=BOOKING_EMAIL,
+    )
+
+    print(f"\n📧 ACTUAL AGENT RESPONSE:")
+    print(f"{'─'*60}")
+    print(response)
+    print(f"{'─'*60}")
+    print(f"\n📋 EXPECTED RESPONSE FORMAT:")
+    print(f"   • Should inform Sarah that {start_time}-{end_time} is not available")
+    print(f"   • Should mention there's a conflicting event")
+    print(f"   • Should offer to show available slots for {meeting_date}")
+    print(f"   • Should end with 'By VibeCal'")
+    print(f"   • Should be professional and helpful tone")
+    print(f"\n⏰ EXPECTED CONFLICT: {start_time}-{end_time} should be blocked by '{conflicting_title}'")
+
+    # Verify that no new event was created (no double booking)
+    availability = calendar_assistant.get_availability(meeting_date, meeting_date)
+    events_at_time = []
+    
+    for event in availability["events"]:
+        # Handle both string and dict formats for start/end times
+        event_start = event.get("start")
+        event_end = event.get("end")
+        
+        # If start/end are strings, use them directly
+        if isinstance(event_start, str):
+            event_start_str = event_start
+        elif isinstance(event_start, dict):
+            event_start_str = event_start.get("dateTime", "")
+        else:
+            event_start_str = ""
+        
+        if isinstance(event_end, str):
+            event_end_str = event_end
+        elif isinstance(event_end, dict):
+            event_end_str = event_end.get("dateTime", "")
+        else:
+            event_end_str = ""
+        
+        event_title = event.get("title", event.get("summary", ""))
+        
+        # Check if this event overlaps with our target time slot
+        if event_start_str and event_end_str:
+            # Simple overlap check
+            if (f"{meeting_date}T{start_time}:00" < event_end_str and 
+                f"{meeting_date}T{end_time}:00" > event_start_str):
+                events_at_time.append({
+                    "id": event.get("id"),
+                    "title": event_title,
+                    "start": event_start_str,
+                    "end": event_end_str
+                })
+    
+    # Should only have the original conflicting event, no new events
+    assert len(events_at_time) == 1, f"Expected 1 event at {start_time}-{end_time}, found {len(events_at_time)}"
+    assert events_at_time[0]["id"] == conflicting_event_id, f"Expected conflicting event {conflicting_event_id}, found {events_at_time[0]['id']}"
+    assert events_at_time[0]["title"] == conflicting_title, f"Expected title '{conflicting_title}', found '{events_at_time[0]['title']}'"
+    
+    print(f"✅ VERIFICATION: No double booking occurred")
+    print(f"✅ VERIFICATION: Only the original conflicting event exists")
+    print(f"✅ VERIFICATION: Event ID {conflicting_event_id} is still the only event at {start_time}-{end_time}")
+
+    # Clean up the conflicting event
+    calendar_assistant.cancel_event(conflicting_event_id)
+    print(f"🧹 Cleaned up conflicting event {conflicting_event_id}")
+
+    return conflicting_event_id
+
+
 # ---------------------------------------------------------------------------
 # Thread ID Tests -----------------------------------------------------------
 # ---------------------------------------------------------------------------
@@ -563,6 +749,8 @@ if __name__ == "__main__":
     print(f"Booked event id: {test_id}")
     cancel_id = test_case_4_cancel_event()
     print(f"Cancelled event id: {cancel_id}")
+    conflict_id = test_case_5_slot_conflict_handling()
+    print(f"Conflicting event id: {conflict_id}")
     
     # Run thread ID tests
     test_thread_id_usage()
