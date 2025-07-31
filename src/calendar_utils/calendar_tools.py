@@ -5,6 +5,9 @@ from .calendar_util import get_availability_low_level, book_event_low_level, can
 class CalendarAssistant:
     def __init__(self, user_id: str):
         self.user_id = user_id
+        # Memory for tracking successful operations
+        self._last_booking: Optional[Dict[str, Any]] = None
+        self._last_cancellation: Optional[Dict[str, Any]] = None
 
     # Calendar interaction methods --------------------------
     def get_availability(self, start_date: str, end_date: str):
@@ -21,7 +24,7 @@ class CalendarAssistant:
         location: str = "",
         reminders: Optional[Dict[str, Any]] = None,
     ):
-        return book_event_low_level(
+        result = book_event_low_level(
             user_id=self.user_id,
             start_date=date,
             start_time=start_time,
@@ -33,12 +36,65 @@ class CalendarAssistant:
             location=location,
             reminders=reminders,
         )
+        
+        # Store successful booking in memory
+        if result and result.get('event_id'):
+            self._last_booking = result
+        
+        return result
 
     def cancel_event(self, event_id: str, notify_attendees: bool = True):
-        return cancel_event_low_level(self.user_id, event_id, notify_attendees)
+        result = cancel_event_low_level(self.user_id, event_id, notify_attendees)
+        
+        # Store successful cancellation in memory
+        if result and result.get('status') == 'cancelled':
+            self._last_cancellation = result
+        
+        return result
 
     def get_event(self, event_id: str):
         return get_event_low_level(self.user_id, event_id)
+
+    # Memory retrieval methods ------------------------------
+    def get_last_booking_info(self) -> Optional[Dict[str, Any]]:
+        """Get information about the last successful booking."""
+        return self._last_booking
+
+    def get_last_cancellation_info(self) -> Optional[Dict[str, Any]]:
+        """Get information about the last successful cancellation."""
+        return self._last_cancellation
+
+    def get_booking_confirmation_text(self) -> Optional[str]:
+        """Get formatted confirmation text for the last booking."""
+        if not self._last_booking:
+            return None
+        
+        event_id = self._last_booking.get('event_id')
+        html_link = self._last_booking.get('html_link')
+        title = self._last_booking.get('title')
+        
+        confirmation_parts = []
+        if event_id:
+            confirmation_parts.append(f"Event ID: {event_id}")
+        if html_link:
+            confirmation_parts.append(f"Calendar Link: {html_link}")
+        
+        if confirmation_parts:
+            return "\n".join(confirmation_parts)
+        return None
+
+    def get_cancellation_confirmation_text(self) -> Optional[str]:
+        """Get formatted confirmation text for the last cancellation."""
+        if not self._last_cancellation:
+            return None
+        
+        event_id = self._last_cancellation.get('event_id')
+        return f"Event {event_id} has been successfully cancelled."
+
+    def clear_memory(self):
+        """Clear all stored memory."""
+        self._last_booking = None
+        self._last_cancellation = None
 
 
 def build_calendar_tools() -> List[Dict[str, Any]]:

@@ -36,7 +36,7 @@ Your goals:
 4. When cancelling → call cancel_event with the provided event_id.
 5. Never proactively book or cancel without explicit confirmation.
 6. After tool calls, reply with a human-readable email starting with "TO: [email]" line indicating greeting recipient, and end with "By VibeCal".
-7. When booking succeeds, include "Event ID: [id]" and calendar link.
+7. IMPORTANT: Do NOT include event ID or calendar link in your response. The system will automatically add these details for successful bookings and cancellations.
 """
 
 
@@ -202,5 +202,15 @@ def run_booking_agent(
         tool_executor=_tool_executor,
         max_iterations=max_iterations,
     )
+
+    # Check for successful operations and append confirmation details
+    booking_confirmation = cal_assistant.get_booking_confirmation_text()
+    cancellation_confirmation = cal_assistant.get_cancellation_confirmation_text()
+    
+    # Append confirmation details if available
+    if booking_confirmation:
+        final_response += f"\n\n{booking_confirmation}"
+    elif cancellation_confirmation:
+        final_response += f"\n\n{cancellation_confirmation}"
 
     return final_response 

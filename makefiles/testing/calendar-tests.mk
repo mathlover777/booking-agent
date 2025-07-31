@@ -1,6 +1,6 @@
 # Vibes CDK Project - Calendar Owner Resolver Tests
 
-.PHONY: test-calendar-owner-resolver test-calendar-owner-resolver-integration test-case-1-single-agent test-case-2-agent-not-found test-case-3-agent-typo test-case-4-llm-disambiguation test-case-5-missing-user-email test-case-6-typo-with-valid test-case-7-two-agents-one-typo test-case-8-case-insensitive test-case-9-display-name test-case-10-all-typos test-all-cases
+.PHONY: test-calendar-owner-resolver test-calendar-owner-resolver-integration test-calendar-assistant-memory test-case-1-single-agent test-case-2-agent-not-found test-case-3-agent-typo test-case-4-llm-disambiguation test-case-5-missing-user-email test-case-6-typo-with-valid test-case-7-two-agents-one-typo test-case-8-case-insensitive test-case-9-display-name test-case-10-all-typos test-all-cases
 
 test-calendar-owner-resolver: ## Test calendar owner resolution logic
 	@echo "Testing calendar owner resolution logic..."
@@ -9,6 +9,10 @@ test-calendar-owner-resolver: ## Test calendar owner resolution logic
 test-calendar-owner-resolver-integration: ## Test calendar owner resolver with real AWS services
 	@echo "Testing calendar owner resolver integration tests..."
 	cd src && python -m booking_agent.test_calendar_owner_resolver_integration
+
+test-calendar-assistant-memory: ## Test CalendarAssistant memory functionality
+	@echo "Testing CalendarAssistant memory functionality..."
+	cd src && python -m calendar_utils.test_calendar_tools_memory
 
 # Real integration tests with synthetic data
 test-case-1-single-agent: ## Test Case 1: Single agent, user in thread
