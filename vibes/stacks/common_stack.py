@@ -3,8 +3,11 @@ from dotenv import load_dotenv
 from aws_cdk import (
     Stack,
     RemovalPolicy,
+    Duration,
     aws_s3 as s3,
     aws_ses as ses,
+    aws_ses_actions as ses_actions,
+    aws_s3_notifications as s3n,
     aws_route53 as route53,
     CfnOutput,
     aws_iam as iam,
@@ -24,6 +27,7 @@ class CommonStack(Stack):
     - S3 Bucket
     - Route53 records
     - Lambda Layers (shared dependencies and auth)
+    - EmailRouter Lambda (routes emails to stage-specific folders)
     """
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
@@ -74,7 +78,57 @@ class CommonStack(Stack):
             removal_policy=RemovalPolicy.RETAIN,
         )
 
+        # Create IAM role for EmailRouter Lambda
+        email_router_role = iam.Role(
+            self, "EmailRouterRole",
+            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+            managed_policies=[
+                iam.ManagedPolicy.from_aws_managed_policy_name("service-role/AWSLambdaBasicExecutionRole")
+            ]
+        )
 
+        # Add S3 permissions to the EmailRouter role
+        self.email_bucket.grant_read(email_router_role)
+        self.email_bucket.grant_write(email_router_role)
+
+        # Add SQS permissions to the EmailRouter role (for all SQS queues)
+        email_router_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "sqs:SendMessage",
+                    "sqs:GetQueueUrl"
+                ],
+                resources=[
+                    f"arn:aws:sqs:*:{self.account}:email-processor-queue-*"
+                ]
+            )
+        )
+
+        # Create EmailRouter Lambda function
+        email_router = lambda_.Function(
+            self, "EmailRouter",
+            function_name="EmailRouter",
+            runtime=lambda_.Runtime.PYTHON_3_12,
+            handler="email_router.lambda_handler",
+            code=lambda_.Code.from_asset("src"),
+            role=email_router_role,
+            timeout=Duration.seconds(60),
+            memory_size=256,
+            layers=[self.common_layer],
+            environment={
+                "LOG_LEVEL": "INFO",
+                "DOMAIN_NAME": os.getenv('DOMAIN_NAME'),
+                "EMAIL_BUCKET_NAME": self.email_bucket.bucket_name
+            }
+        )
+
+        # Add S3 trigger to EmailRouter for incoming emails
+        self.email_bucket.add_event_notification(
+            s3.EventType.OBJECT_CREATED,
+            s3n.LambdaDestination(email_router),
+            s3.NotificationKeyFilter(prefix="incoming/")
+        )
 
         # Import existing hosted zone for bhaang.com
         hosted_zone = route53.HostedZone.from_lookup(
@@ -115,10 +169,32 @@ class CommonStack(Stack):
             receipt_rule_set_name=os.getenv('RECEIPT_RULE_SET_NAME')
         )
 
+        # SES ReceiptRule for all emails to the domain - stores in incoming/ prefix
+        ses.ReceiptRule(
+            self, "EmailReceiptRule",
+            rule_set=self.ses_receipt_rule_set,
+            recipients=[os.getenv('DOMAIN_NAME')],  # All emails to @DOMAIN_NAME
+            actions=[
+                ses_actions.AddHeader(
+                    name="X-SES-RECEIPT-RULE",
+                    value="email-router"
+                ),
+                ses_actions.S3(
+                    bucket=self.email_bucket,
+                    object_key_prefix="incoming/",  # Neutral prefix for routing
+                    topic=None
+                )
+            ],
+            scan_enabled=True,
+            tls_policy=ses.TlsPolicy.OPTIONAL,
+            enabled=True 
+        )
+
         # Outputs
         CfnOutput(self, "EmailBucketName", value=self.email_bucket.bucket_name)
         CfnOutput(self, "SESDomainName", value=os.getenv('DOMAIN_NAME'))
         CfnOutput(self, "ReceiptRuleSetName", value=self.ses_receipt_rule_set.receipt_rule_set_name)
         CfnOutput(self, "HostedZoneId", value=hosted_zone.hosted_zone_id)
         CfnOutput(self, "CommonLayerArn", value=self.common_layer.layer_version_arn, export_name="VibesCommonStackCommonLayerArn")
-        CfnOutput(self, "AuthLayerArn", value=self.auth_layer.layer_version_arn, export_name="VibesCommonStackAuthLayerArn") 
+        CfnOutput(self, "AuthLayerArn", value=self.auth_layer.layer_version_arn, export_name="VibesCommonStackAuthLayerArn")
+        CfnOutput(self, "EmailRouterFunctionName", value=email_router.function_name) 
