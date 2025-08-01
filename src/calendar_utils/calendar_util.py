@@ -20,27 +20,26 @@ logger = get_logger(__name__)
 
 def get_google_oauth_token_low_level(user_id: str) -> Optional[str]:
     """Retrieve Google OAuth token for a user from Clerk API"""
-    print(f"🔑 [DEBUG] get_google_oauth_token_low_level called with user_id: {user_id}")
+    logger.debug(f"🔑 get_google_oauth_token_low_level called with user_id: {user_id}")
     try:
         url = f"https://api.clerk.com/v1/users/{user_id}/oauth_access_tokens/oauth_google"
         headers = {'Authorization': f'Bearer {_secrets["CLERK_SECRET_KEY"]}'}
         params = {'limit': 10, 'offset': 0}
         
-        print(f"🔑 [DEBUG] Making Clerk OAuth API request to: {url}")
+        logger.debug(f"🔑 Making Clerk OAuth API request to: {url}")
         response = requests.get(url, headers=headers, params=params, timeout=30)
-        print(f"🔑 [DEBUG] Clerk OAuth API response status: {response.status_code}")
+        logger.debug(f"🔑 Clerk OAuth API response status: {response.status_code}")
         
         response.raise_for_status()
         
         data = response.json()
-        print(f"🔑 [DEBUG] Clerk OAuth API response data: {data}")
+        logger.debug(f"🔑 Clerk OAuth API response data: {data}")
         
         token = data[0]["token"] if data else None
-        print(f"🔑 [DEBUG] Retrieved OAuth token: {'Yes' if token else 'No'}")
+        logger.debug(f"🔑 Retrieved OAuth token: {'Yes' if token else 'No'}")
         return token
     except Exception as e:
-        print(f"❌ [DEBUG] Error getting Google OAuth token for user {user_id}: {e}")
-        logger.error(f"Error getting Google OAuth token for user {user_id}: {e}")
+        logger.error(f"❌ Error getting Google OAuth token for user {user_id}: {e}")
         return None
 
 
@@ -55,25 +54,24 @@ def get_user_timezone_low_level(user_id: str, oauth_token: str) -> str:
     Returns:
         Timezone identifier (e.g., "America/New_York")
     """
-    print(f"🌍 [DEBUG] get_user_timezone_low_level called with user_id: {user_id}")
+    logger.debug(f"🌍 get_user_timezone_low_level called with user_id: {user_id}")
     try:
         calendar_url = f"{GOOGLE_CALENDAR_API_BASE}/calendars/primary"
         headers = {'Authorization': f'Bearer {oauth_token}'}
         
-        print(f"🌍 [DEBUG] Making Google Calendar API request to: {calendar_url}")
+        logger.debug(f"🌍 Making Google Calendar API request to: {calendar_url}")
         response = requests.get(calendar_url, headers=headers, timeout=30)
-        print(f"🌍 [DEBUG] Google Calendar API response status: {response.status_code}")
+        logger.debug(f"🌍 Google Calendar API response status: {response.status_code}")
         
         response.raise_for_status()
         
         calendar_data = response.json()
         timezone_id = calendar_data.get('timeZone', 'UTC')
-        print(f"🌍 [DEBUG] Retrieved timezone: {timezone_id}")
+        logger.debug(f"🌍 Retrieved timezone: {timezone_id}")
         return timezone_id
         
     except Exception as e:
-        print(f"❌ [DEBUG] Error getting timezone for user {user_id}: {e}")
-        logger.error(f"Error getting timezone for user {user_id}: {e}")
+        logger.error(f"❌ Error getting timezone for user {user_id}: {e}")
         return 'UTC'  # Fallback to UTC
 
 

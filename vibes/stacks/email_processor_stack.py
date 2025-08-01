@@ -16,13 +16,15 @@ from aws_cdk import (
     aws_route53_targets as targets,
     aws_certificatemanager as acm,
     CfnOutput,
-    Fn,
 )
 from constructs import Construct
 
 # Load base environment variables
 load_dotenv('.env.base')
 
+
+COMMON_LAYER_VERSION = 8
+AUTH_LAYER_VERSION = 8
 
 class EmailProcessorStack(Stack):
     """
@@ -55,10 +57,10 @@ class EmailProcessorStack(Stack):
             receipt_rule_set_name=os.getenv('RECEIPT_RULE_SET_NAME')  # Use environment variable
         )
 
-        # Import the shared Lambda Layers from common stack using cross-stack reference
-        # Get the layer ARNs from the common stack's outputs
-        common_layer_arn = Fn.import_value("VibesCommonStackCommonLayerArn")
-        auth_layer_arn = Fn.import_value("VibesCommonStackAuthLayerArn")
+        # Import the shared Lambda Layers from common stack by constructing ARNs
+        # Since we know the stack structure, we can predict the ARNs
+        common_layer_arn = f"arn:aws:lambda:{self.region}:{self.account}:layer:vibes-common-dependencies:{COMMON_LAYER_VERSION}"
+        auth_layer_arn = f"arn:aws:lambda:{self.region}:{self.account}:layer:vibes-auth-dependencies:{AUTH_LAYER_VERSION}"
         
         common_layer = lambda_.LayerVersion.from_layer_version_arn(
             self, "ImportedCommonLayer",
@@ -83,8 +85,10 @@ class EmailProcessorStack(Stack):
                 type=dynamodb.AttributeType.STRING
             ),
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
-            removal_policy=RemovalPolicy.RETAIN,
-            point_in_time_recovery=True,
+            point_in_time_recovery_specification=dynamodb.PointInTimeRecoverySpecification(
+                point_in_time_recovery_enabled=True,
+                recovery_period_in_days=35
+            ),
         )
 
         # Add GSI for assist_local lookups
