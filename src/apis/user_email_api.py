@@ -2,7 +2,7 @@ import json
 import os
 import boto3
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 from common_utils.clerk_utils import get_user_primary_email
 
@@ -111,7 +111,7 @@ def update_user_email(user_id: str, event: Dict[str, Any]) -> Dict[str, Any]:
         # Prepare keys and timestamp
         pk = f"uid:{user_id}"
         sk = "data"
-        now = datetime.now(datetime.UTC).isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         
         # Check if email already exists for another user using GSI
         email_check_response = table.query(

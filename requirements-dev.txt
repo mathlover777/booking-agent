@@ -3,3 +3,4 @@ constructs
 pytest
 python-dotenv
 ruff
+PyJWT
