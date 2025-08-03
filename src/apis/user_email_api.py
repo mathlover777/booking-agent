@@ -111,7 +111,7 @@ def update_user_email(user_id: str, event: Dict[str, Any]) -> Dict[str, Any]:
         # Prepare keys and timestamp
         pk = f"uid:{user_id}"
         sk = "data"
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(datetime.UTC).isoformat()
         
         # Check if email already exists for another user using GSI
         email_check_response = table.query(

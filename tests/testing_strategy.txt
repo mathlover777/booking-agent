@@ -1,0 +1,17 @@
+We want to test various functions in src
+
+The tests should not use internet and it should be deterministic
+
+Use the root level tests folder to organize all unit tests
+
+Depending on the need various aws clients from boto3 on secret manager, s3 etc needs to be mocked.
+
+Also the code uses various environemnt variables so mock them appropriately
+
+organize the tests well, and follow best practice so that in testing code duplication can be avoided
+
+follow kiss principle.
+
+Also for these tests we do not need make file targets like others I want to use Pytest
+
+and run them ideally by running pytest from the root

@@ -1,0 +1,31 @@
+# CDK build artifacts
+cdk.out/
+
+# Lambda layer dependencies
+lambda-layer/
+
+# Source directory (tests should be in /tests)
+src/
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db 

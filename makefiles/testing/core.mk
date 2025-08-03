@@ -1,6 +1,14 @@
 # Vibes CDK Project - Core Testing Targets
 
-.PHONY: test-email test-calendar test-agent test-agent-calendar-failures
+.PHONY: test-email test-calendar test-agent test-agent-calendar-failures test-pytest test
+
+# Run all tests using pytest (only tests in /tests directory)
+test-pytest: ## Run all tests using pytest (only tests in /tests directory)
+	@echo "Running all tests with pytest..."
+	source /Users/sourav/doc32/v2/.venv/bin/activate && pytest tests/ -v
+
+# Simple alias for pytest
+test: test-pytest ## Run all tests (alias for test-pytest)
 
 # Email processing test
 test-email: ## Test email processing and auto-reply with default S3 key
