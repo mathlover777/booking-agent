@@ -6,6 +6,7 @@ include makefiles/common.mk
 include makefiles/deployment.mk
 include makefiles/development.mk
 include makefiles/utils.mk
+include makefiles/test.mk
 include makefiles/testing/core.mk
 include makefiles/testing/calendar-tests.mk
 include makefiles/testing/api-tests.mk

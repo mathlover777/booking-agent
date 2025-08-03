@@ -1,11 +1,6 @@
 # Vibes CDK Project - Core Testing Targets
 
-.PHONY: test-email test-calendar test-agent test-agent-calendar-failures unit-test
-
-# Run unit tests using pytest (only tests in /tests/unit directory)
-unit-test: ## Run unit tests using pytest (only tests in /tests/unit directory)
-	@echo "Running unit tests with pytest..."
-	source /Users/sourav/doc32/v2/.venv/bin/activate && pytest tests/unit/ -v
+.PHONY: test-email test-calendar test-agent test-agent-calendar-failures
 
 # Email processing test
 test-email: ## Test email processing and auto-reply with default S3 key
