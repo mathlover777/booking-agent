@@ -18,6 +18,7 @@ from aws_cdk import (
     aws_sqs as sqs,
     CfnOutput,
 )
+from aws_cdk.aws_lambda_event_sources import SqsEventSource
 from constructs import Construct
 
 # Load base environment variables
@@ -220,7 +221,7 @@ class EmailProcessorStack(Stack):
 
         # Add SQS trigger to lambda
         email_processor.add_event_source(
-            lambda_.SqsEventSource(
+            SqsEventSource(
                 email_queue,
                 batch_size=1  # Process one message at a time for now
             )
