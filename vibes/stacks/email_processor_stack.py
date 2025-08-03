@@ -15,6 +15,7 @@ from aws_cdk import (
     aws_route53 as route53,
     aws_route53_targets as targets,
     aws_certificatemanager as acm,
+    aws_sqs as sqs,
     CfnOutput,
 )
 from constructs import Construct
@@ -46,15 +47,10 @@ class EmailProcessorStack(Stack):
 
         # Import the shared S3 bucket from infrastructure stack
         # Note: This requires the infrastructure stack to be deployed first
-        email_bucket = s3.Bucket.from_bucket_name(
+        email_bucket = s3.Bucket.from_bucket_attributes(
             self, "ImportedEmailBucket",
-            bucket_name=os.getenv('EMAIL_BUCKET_NAME')
-        )
-
-        # Import the shared ReceiptRuleSet from infrastructure stack
-        ses_receipt_rule_set = ses.ReceiptRuleSet.from_receipt_rule_set_name(
-            self, "ImportedReceiptRuleSet",
-            receipt_rule_set_name=os.getenv('RECEIPT_RULE_SET_NAME')  # Use environment variable
+            bucket_name=os.getenv('EMAIL_BUCKET_NAME'),
+            bucket_arn=f"arn:aws:s3:::{os.getenv('EMAIL_BUCKET_NAME')}"
         )
 
         # Import the shared Lambda Layers from common stack by constructing ARNs
@@ -202,33 +198,40 @@ class EmailProcessorStack(Stack):
             }
         )
 
-        # Add S3 trigger to lambda with stage-specific prefix
-        email_bucket.add_event_notification(
-            s3.EventType.OBJECT_CREATED,
-            s3n.LambdaDestination(email_processor),
-            s3.NotificationKeyFilter(prefix=f"{stage}/emails/")  # Stage-specific prefix
+        # Create SQS queue for email processing with DLQ
+        dlq = sqs.Queue(
+            self, f"EmailProcessorDLQ{stage.title()}",
+            queue_name=f"email-processor-dlq-{stage}",
+            retention_period=Duration.days(14),
+            visibility_timeout=Duration.seconds(30)
         )
 
-        # SES ReceiptRule for all emails to the domain
-        # This captures all emails to @DOMAIN_NAME, then Lambda determines the user
-        ses.ReceiptRule(
-            self, f"EmailReceiptRule{stage.title()}",
-            rule_set=ses_receipt_rule_set,
-            recipients=[os.getenv('DOMAIN_NAME')],  # All emails to @DOMAIN_NAME
-            actions=[
-                ses_actions.AddHeader(
-                    name="X-SES-RECEIPT-RULE",
-                    value=f"email-processor-{stage}"
-                ),
-                ses_actions.S3(
-                    bucket=email_bucket,
-                    object_key_prefix=f"{stage}/emails/",  # Stage-specific prefix
-                    topic=None
-                )
-            ],
-            scan_enabled=True,
-            tls_policy=ses.TlsPolicy.OPTIONAL,
-            enabled=True 
+        # Main SQS queue for email processing
+        email_queue = sqs.Queue(
+            self, f"EmailProcessorQueue{stage.title()}",
+            queue_name=f"email-processor-queue-{stage}",
+            visibility_timeout=Duration.seconds(900),  # Match Lambda timeout
+            retention_period=Duration.days(4),
+            dead_letter_queue=sqs.DeadLetterQueue(
+                max_receive_count=3,
+                queue=dlq
+            )
+        )
+
+        # Add SQS trigger to lambda
+        email_processor.add_event_source(
+            lambda_.SqsEventSource(
+                email_queue,
+                batch_size=1  # Process one message at a time for now
+            )
+        )
+
+        # Grant SQS permission to invoke the Lambda function
+        email_processor.add_permission(
+            "SQSInvokePermission",
+            principal=iam.ServicePrincipal("sqs.amazonaws.com"),
+            action="lambda:InvokeFunction",
+            source_arn=email_queue.queue_arn
         )
 
         # Import SSL certificate
@@ -331,10 +334,14 @@ class EmailProcessorStack(Stack):
                  value=user_email_api.function_name)
         CfnOutput(self, f"JwtAuthorizerFunctionName{stage.title()}", 
                  value=jwt_authorizer.function_name)
+        CfnOutput(self, f"EmailProcessorQueueName{stage.title()}", 
+                 value=email_queue.queue_name)
+        CfnOutput(self, f"EmailProcessorQueueUrl{stage.title()}", 
+                 value=email_queue.queue_url)
+        CfnOutput(self, f"EmailProcessorDLQName{stage.title()}", 
+                 value=dlq.queue_name)
         CfnOutput(self, f"StageEmailAddress{stage.title()}", 
                  value=os.getenv('DOMAIN_NAME'))
-        CfnOutput(self, f"StageS3Prefix{stage.title()}", 
-                 value=f"{stage}/emails/")
         CfnOutput(self, f"ApiGatewayUrl{stage.title()}", 
                  value=api.url)
         CfnOutput(self, f"ApiCustomDomainUrl{stage.title()}", 

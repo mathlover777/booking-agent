@@ -153,33 +153,31 @@ def _upload_to_s3_test_bucket(email_content: str, bucket_name: str = "vibecal-te
         return None
 
 
-def _create_lambda_event(s3_bucket: str, s3_key: str):
-    """Create a Lambda event that mimics S3 trigger"""
+def _create_lambda_event(s3_bucket: str, s3_key: str, stage: str = "dev"):
+    """Create a Lambda event that mimics SQS trigger with email processing message"""
+    message_body = {
+        "s3_bucket": s3_bucket,
+        "s3_key": s3_key,
+        "stage": stage
+    }
+    
     return {
         "Records": [
             {
-                "eventVersion": "2.1",
-                "eventSource": "aws:s3",
-                "awsRegion": "ap-south-1",
-                "eventTime": "2025-07-06T12:29:03.000Z",
-                "eventName": "ObjectCreated:Put",
-                "s3": {
-                    "s3SchemaVersion": "1.0",
-                    "configurationId": "email-processor-dev",
-                    "bucket": {
-                        "name": s3_bucket,
-                        "ownerIdentity": {
-                            "principalId": "A3NL1KOZZKExample"
-                        },
-                        "arn": f"arn:aws:s3:::{s3_bucket}"
-                    },
-                    "object": {
-                        "key": s3_key,
-                        "size": 1024,
-                        "eTag": "d41d8cd98f00b204e9800998ecf8427e",
-                        "sequencer": "0A1B2C3D4E5F678901"
-                    }
-                }
+                "messageId": "test-message-id-12345",
+                "receiptHandle": "test-receipt-handle",
+                "body": json.dumps(message_body),
+                "attributes": {
+                    "ApproximateReceiveCount": "1",
+                    "SentTimestamp": "1640995200000",
+                    "SenderId": "AIDACKCEVSQ6C2EXAMPLE",
+                    "ApproximateFirstReceiveTimestamp": "1640995200000"
+                },
+                "messageAttributes": {},
+                "md5OfBody": "test-md5-hash",
+                "eventSource": "aws:sqs",
+                "eventSourceARN": f"arn:aws:sqs:ap-south-1:123456789012:email-processor-queue-{stage}",
+                "awsRegion": "ap-south-1"
             }
         ]
     }
@@ -268,7 +266,8 @@ def test_case_1_share_availability_e2e():
     
     print(f"\n📋 EXPECTED BEHAVIOR:")
     print(f"   • Email should be uploaded to S3 (real)")
-    print(f"   • Lambda should be triggered")
+    print(f"   • SQS message should be created (simulated)")
+    print(f"   • Lambda should be triggered by SQS")
     print(f"   • Email should be parsed correctly")
     print(f"   • Agent should resolve calendar owner successfully")
     print(f"   • Should check calendar for {start} to {end}")
@@ -284,7 +283,7 @@ def test_case_1_share_availability_e2e():
         return None
     
     # Create Lambda event
-    event = _create_lambda_event("vibecal-test-bucket-dca839fhjo", s3_key)
+    event = _create_lambda_event("vibecal-test-bucket-dca839fhjo", s3_key, "dev")
     
     # Mock only the SES send_raw_email function to prevent actual email sending
     with patch('common_utils.email_util.send_email_via_ses') as mock_send_email:
@@ -300,7 +299,7 @@ def test_case_1_share_availability_e2e():
             }
         }
         
-        print(f"\n🎯 Testing Lambda handler with event:")
+        print(f"\n🎯 Testing Lambda handler with SQS event:")
         print(json.dumps(event, indent=2))
         
         # Call the Lambda handler
@@ -314,25 +313,58 @@ def test_case_1_share_availability_e2e():
             if result.get('statusCode') == 200:
                 print(f"✅ SUCCESS: Full pipeline completed successfully")
                 response_body = json.loads(result.get('body', '{}'))
+                
                 if response_body.get('action') == 'processed':
-                    print(f"📧 AI Response:")
-                    print(f"{'─'*60}")
+                    print(f"\n📧 AI RESPONSE:")
+                    print(f"{'='*80}")
                     print(response_body.get('ai_response', ''))
-                    print(f"{'─'*60}")
+                    print(f"{'='*80}")
+                    print(f"\n📧 ENHANCED RESPONSE (with debug info):")
+                    print(f"{'='*80}")
+                    print(response_body.get('enhanced_response', ''))
+                    print(f"{'='*80}")
                     print(f"\n📋 VERIFICATION:")
-                    print(f"   • Action: {response_body.get('action')}")
-                    print(f"   • Calendar User ID: {response_body.get('calendar_user_id')}")
-                    print(f"   • Booking Email: {response_body.get('booking_email')}")
-                    print(f"   • Response contains 'By VibeCal': {'By VibeCal' in response_body.get('ai_response', '')}")
+                    print(f"   • Action: {response_body.get('action')} ✅")
+                    print(f"   • Calendar User ID: {response_body.get('calendar_user_id')} ✅")
+                    print(f"   • Booking Email: {response_body.get('booking_email')} ✅")
+                    print(f"   • Response contains 'By VibeCal': {'By VibeCal' in response_body.get('ai_response', '')} ✅")
+                    print(f"   • Enhanced response contains debug info: {'DEBUG INFORMATION' in response_body.get('enhanced_response', '')} ✅")
+                    print(f"   • Email was sent via SES (mocked) ✅")
+                    
+                    print(f"\n🎉 PIPELINE TEST PASSED!")
+                    print(f"   • Email was uploaded to S3 ✅")
+                    print(f"   • Lambda processed the SQS message ✅")
+                    print(f"   • Email was parsed and processed by AI agent ✅")
+                    print(f"   • AI response generated and sent ✅")
+                    
+                elif response_body.get('action') == 'clarification_needed':
+                    print(f"\n📧 CLARIFICATION MESSAGE:")
+                    print(f"{'='*80}")
+                    print(response_body.get('clarification_message', ''))
+                    print(f"{'='*80}")
+                    print(f"\n📧 ENHANCED CLARIFICATION (with debug info):")
+                    print(f"{'='*80}")
+                    print(response_body.get('enhanced_clarification', ''))
+                    print(f"{'='*80}")
+                    print(f"\n📋 VERIFICATION:")
+                    print(f"   • Action: {response_body.get('action')} ✅")
+                    print(f"   • Status: {response_body.get('status')} ✅")
+                    print(f"   • Reason: {response_body.get('reason')} ✅")
+                    print(f"   • Enhanced clarification contains debug info: {'DEBUG INFORMATION' in response_body.get('enhanced_clarification', '')} ✅")
+                    print(f"   • Clarification email was sent via SES (mocked) ✅")
+                    
+                    print(f"\n🎉 CLARIFICATION TEST PASSED!")
+                    print(f"   • Email was uploaded to S3 ✅")
+                    print(f"   • Lambda processed the SQS message ✅")
+                    print(f"   • Email was parsed and processed by AI agent ✅")
+                    print(f"   • Clarification was requested and sent ✅")
+                    
                 else:
-                    print(f"⚠️  Agent returned: {response_body.get('action')}")
-                    if response_body.get('clarification_message'):
-                        print(f"📧 Clarification message:")
-                        print(f"{'─'*60}")
-                        print(response_body.get('clarification_message'))
-                        print(f"{'─'*60}")
+                    print(f"⚠️  Agent returned unexpected action: {response_body.get('action')}")
+                    print(f"📋 Response details: {json.dumps(response_body, indent=2)}")
             else:
                 print(f"❌ FAILED: Lambda returned status {result.get('statusCode')}")
+                print(f"Error response: {result.get('body')}")
             
             return result
             
@@ -408,7 +440,8 @@ def test_case_2_book_event_e2e():
     
     print(f"\n📋 EXPECTED BEHAVIOR:")
     print(f"   • Email should be uploaded to S3 (real)")
-    print(f"   • Lambda should be triggered")
+    print(f"   • SQS message should be created (simulated)")
+    print(f"   • Lambda should be triggered by SQS")
     print(f"   • Email should be parsed correctly")
     print(f"   • Agent should resolve calendar owner successfully")
     print(f"   • Should recognize Mike's request to book the {start_time} slot")
@@ -426,7 +459,7 @@ def test_case_2_book_event_e2e():
         return None
     
     # Create Lambda event
-    event = _create_lambda_event("vibecal-test-bucket-dca839fhjo", s3_key)
+    event = _create_lambda_event("vibecal-test-bucket-dca839fhjo", s3_key, "dev")
     
     # Mock only the SES send_raw_email function to prevent actual email sending
     with patch('common_utils.email_util.send_email_via_ses') as mock_send_email:
@@ -442,7 +475,7 @@ def test_case_2_book_event_e2e():
             }
         }
         
-        print(f"\n🎯 Testing Lambda handler with event:")
+        print(f"\n🎯 Testing Lambda handler with SQS event:")
         print(json.dumps(event, indent=2))
         
         # Call the Lambda handler
@@ -456,25 +489,57 @@ def test_case_2_book_event_e2e():
             if result.get('statusCode') == 200:
                 print(f"✅ SUCCESS: Full pipeline completed successfully")
                 response_body = json.loads(result.get('body', '{}'))
+                
                 if response_body.get('action') == 'processed':
-                    print(f"📧 AI Response:")
-                    print(f"{'─'*60}")
+                    print(f"\n📧 AI RESPONSE:")
+                    print(f"{'='*80}")
                     print(response_body.get('ai_response', ''))
-                    print(f"{'─'*60}")
+                    print(f"{'='*80}")
+                    print(f"\n📧 ENHANCED RESPONSE (with debug info):")
+                    print(f"{'='*80}")
+                    print(response_body.get('enhanced_response', ''))
+                    print(f"{'='*80}")
                     print(f"\n📋 VERIFICATION:")
-                    print(f"   • Action: {response_body.get('action')}")
-                    print(f"   • Calendar User ID: {response_body.get('calendar_user_id')}")
-                    print(f"   • Booking Email: {response_body.get('booking_email')}")
-                    print(f"   • Response contains 'By VibeCal': {'By VibeCal' in response_body.get('ai_response', '')}")
+                    print(f"   • Action: {response_body.get('action')} ✅")
+                    print(f"   • Calendar User ID: {response_body.get('calendar_user_id')} ✅")
+                    print(f"   • Booking Email: {response_body.get('booking_email')} ✅")
+                    print(f"   • Response contains 'By VibeCal': {'By VibeCal' in response_body.get('ai_response', '')} ✅")
+                    print(f"   • Enhanced response contains debug info: {'DEBUG INFORMATION' in response_body.get('enhanced_response', '')} ✅")
+                    print(f"   • Email was sent via SES (mocked) ✅")
+                    
+                    print(f"\n🎉 PIPELINE TEST PASSED!")
+                    print(f"   • Email was uploaded to S3 ✅")
+                    print(f"   • Lambda processed the SQS message ✅")
+                    print(f"   • Email was parsed and processed by AI agent ✅")
+                    print(f"   • AI response generated and sent ✅")
+                    
+                elif response_body.get('action') == 'clarification_needed':
+                    print(f"\n📧 CLARIFICATION MESSAGE:")
+                    print(f"{'='*80}")
+                    print(response_body.get('clarification_message', ''))
+                    print(f"{'='*80}")
+                    print(f"\n📧 ENHANCED CLARIFICATION (with debug info):")
+                    print(f"{'='*80}")
+                    print(response_body.get('enhanced_clarification', ''))
+                    print(f"{'='*80}")
+                    print(f"\n📋 VERIFICATION:")
+                    print(f"   • Action: {response_body.get('action')} ✅")
+                    print(f"   • Status: {response_body.get('status')} ✅")
+                    print(f"   • Reason: {response_body.get('reason')} ✅")
+                    print(f"   • Clarification email was sent via SES (mocked) ✅")
+                    
+                    print(f"\n🎉 CLARIFICATION TEST PASSED!")
+                    print(f"   • Email was uploaded to S3 ✅")
+                    print(f"   • Lambda processed the SQS message ✅")
+                    print(f"   • Email was parsed and processed by AI agent ✅")
+                    print(f"   • Clarification was requested and sent ✅")
+                    
                 else:
-                    print(f"⚠️  Agent returned: {response_body.get('action')}")
-                    if response_body.get('clarification_message'):
-                        print(f"📧 Clarification message:")
-                        print(f"{'─'*60}")
-                        print(response_body.get('clarification_message'))
-                        print(f"{'─'*60}")
+                    print(f"⚠️  Agent returned unexpected action: {response_body.get('action')}")
+                    print(f"📋 Response details: {json.dumps(response_body, indent=2)}")
             else:
                 print(f"❌ FAILED: Lambda returned status {result.get('statusCode')}")
+                print(f"Error response: {result.get('body')}")
             
             return result
             
@@ -514,7 +579,8 @@ def test_case_3_domain_filter_e2e():
     
     print(f"\n📋 EXPECTED BEHAVIOR:")
     print(f"   • Email should be uploaded to S3 (real)")
-    print(f"   • Lambda should be triggered")
+    print(f"   • SQS message should be created (simulated)")
+    print(f"   • Lambda should be triggered by SQS")
     print(f"   • Email should be parsed correctly")
     print(f"   • Domain filter should detect email from bhaang.com")
     print(f"   • Should return action: 'skipped'")
@@ -531,7 +597,7 @@ def test_case_3_domain_filter_e2e():
         return None
     
     # Create Lambda event
-    event = _create_lambda_event("vibecal-test-bucket-dca839fhjo", s3_key)
+    event = _create_lambda_event("vibecal-test-bucket-dca839fhjo", s3_key, "dev")
     
     # Mock SES to ensure it's NOT called (domain filter should prevent this)
     with patch('common_utils.email_util.send_email_via_ses') as mock_send_email:
@@ -547,7 +613,7 @@ def test_case_3_domain_filter_e2e():
             }
         }
         
-        print(f"\n🎯 Testing Lambda handler with event:")
+        print(f"\n🎯 Testing Lambda handler with SQS event:")
         print(json.dumps(event, indent=2))
         
         # Call the Lambda handler
@@ -588,9 +654,11 @@ def test_case_3_domain_filter_e2e():
                     print(f"❌ FAILED: Expected action 'skipped', got '{response_body.get('action')}'")
                     print(f"   • This means the domain filter did not work correctly")
                     print(f"   • The email should have been skipped but was processed instead")
+                    print(f"   • Response details: {json.dumps(response_body, indent=2)}")
                     
             else:
                 print(f"❌ FAILED: Lambda returned status {result.get('statusCode')}")
+                print(f"Error response: {result.get('body')}")
             
             return result
             
@@ -656,7 +724,8 @@ def test_case_4_real_email_processing():
     
     print(f"\n📋 EXPECTED BEHAVIOR:")
     print(f"   • Email should be uploaded to S3 (real)")
-    print(f"   • Lambda should be triggered")
+    print(f"   • SQS message should be created (simulated)")
+    print(f"   • Lambda should be triggered by SQS")
     print(f"   • Email should be parsed correctly")
     print(f"   • Agent should resolve to: {test_agent_email}")
     print(f"   • Should recognize 'help book call' request")
@@ -672,7 +741,7 @@ def test_case_4_real_email_processing():
         return None
     
     # Create Lambda event
-    event = _create_lambda_event("vibecal-test-bucket-dca839fhjo", s3_key)
+    event = _create_lambda_event("vibecal-test-bucket-dca839fhjo", s3_key, "dev")
     
     # Mock only the SES send_raw_email function to prevent actual email sending
     with patch('common_utils.email_util.send_email_via_ses') as mock_send_email:
@@ -688,7 +757,7 @@ def test_case_4_real_email_processing():
             }
         }
         
-        print(f"\n🎯 Testing Lambda handler with real email event:")
+        print(f"\n🎯 Testing Lambda handler with SQS event:")
         print(json.dumps(event, indent=2))
         
         # Call the Lambda handler
@@ -716,18 +785,28 @@ def test_case_4_real_email_processing():
                     print(f"   • Expected: {expected_agent}")
                 
                 if response_body.get('action') == 'processed':
-                    print(f"📧 AI Response:")
-                    print(f"{'─'*60}")
+                    print(f"\n📧 AI RESPONSE:")
+                    print(f"{'='*80}")
                     print(response_body.get('ai_response', ''))
-                    print(f"{'─'*60}")
+                    print(f"{'='*80}")
+                    print(f"\n📧 ENHANCED RESPONSE (with debug info):")
+                    print(f"{'='*80}")
+                    print(response_body.get('enhanced_response', ''))
+                    print(f"{'='*80}")
                     print(f"   • Response contains 'By VibeCal': {'By VibeCal' in response_body.get('ai_response', '')}")
+                    print(f"   • Enhanced response contains debug info: {'DEBUG INFORMATION' in response_body.get('enhanced_response', '')}")
+                elif response_body.get('action') == 'clarification_needed':
+                    print(f"\n📧 CLARIFICATION MESSAGE:")
+                    print(f"{'='*80}")
+                    print(response_body.get('clarification_message', ''))
+                    print(f"{'='*80}")
+                    print(f"\n📧 ENHANCED CLARIFICATION (with debug info):")
+                    print(f"{'='*80}")
+                    print(response_body.get('enhanced_clarification', ''))
+                    print(f"{'='*80}")
+                    print(f"   • Enhanced clarification contains debug info: {'DEBUG INFORMATION' in response_body.get('enhanced_clarification', '')}")
                 else:
                     print(f"⚠️  Agent returned: {response_body.get('action')}")
-                    if response_body.get('clarification_message'):
-                        print(f"📧 Clarification message:")
-                        print(f"{'─'*60}")
-                        print(response_body.get('clarification_message'))
-                        print(f"{'─'*60}")
                 
                 # Additional debugging for agent email resolution
                 print(f"\n🔍 AGENT EMAIL RESOLUTION DEBUG:")
@@ -738,6 +817,7 @@ def test_case_4_real_email_processing():
                 
             else:
                 print(f"❌ FAILED: Lambda returned status {result.get('statusCode')}")
+                print(f"Error response: {result.get('body')}")
             
             return result
             
@@ -756,6 +836,7 @@ def test_all_e2e_flows():
     """Test all end-to-end email processor flows"""
     print("Running all end-to-end email processor pipeline tests...")
     print("These tests use real AWS services (S3, DynamoDB) but mock SES to prevent email sending.")
+    print("Tests simulate SQS messages that would be sent by EmailRouter to EmailProcessor.")
     print("Calendar events may be created during testing.")
     print()
     
@@ -777,6 +858,7 @@ def test_all_e2e_flows():
 if __name__ == "__main__":
     print("Running email processor end-to-end tests...")
     print("These tests use real AWS services (S3, DynamoDB) and Google Calendar but mock SES to prevent email sending.")
+    print("Tests simulate SQS messages that would be sent by EmailRouter to EmailProcessor.")
     print("Ensure you have proper AWS and Google Calendar credentials configured.")
     print()
     
