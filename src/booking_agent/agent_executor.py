@@ -21,6 +21,9 @@ logger = get_logger(__name__)
 # Get secrets
 _secrets = aws_utils._secrets
 
+# LLM model to use for booking agent
+LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4o")
+
 # -----------------------------------------------------------------------------
 # Helper functions moved from agent.py
 # -----------------------------------------------------------------------------
@@ -118,7 +121,7 @@ def run_ai_agent_loop(
 
         response = client.chat.completions.create(
             name="booking-agent-iteration",
-            model="gpt-4o",
+            model=LLM_MODEL,
             messages=messages,
             tools=tools,
             tool_choice="auto",

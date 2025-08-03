@@ -15,3 +15,25 @@ follow kiss principle.
 Also for these tests we do not need make file targets like others I want to use Pytest
 
 and run them ideally by running pytest from the root
+
+# Integration Tests Organization (Future PR)
+- Move integration tests from src/ to tests/integration/
+- Integration tests can use real services (AWS, external APIs)
+- Create separate conftest.py for integration tests (no autouse=True mocking)
+- Keep unit tests in tests/unit/ with heavy mocking
+- Use pytest markers to categorize tests (fast/slow, unit/integration)
+
+# Docker Testing Strategy (Future PR)
+- Build Docker image once: make test-docker-build
+- Reuse container for multiple test runs (no rebuild overhead)
+- Use volume mounts for development: make test-docker-dev
+- Separate Docker setup for unit vs integration tests
+- Use docker-compose for complex test environments
+- CI/CD: Always build fresh, Development: Reuse containers
+
+# Test Execution Patterns
+- Unit tests: pytest tests/unit/ -v (fast, local)
+- Integration tests: pytest tests/integration/ -v (slow, can use Docker)
+- Single test: pytest tests/integration/ -k "test_name" -v
+- Pattern matching: pytest tests/integration/ -k "pattern" -v
+- All tests: pytest tests/ -v
