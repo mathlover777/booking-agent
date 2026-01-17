@@ -25,8 +25,8 @@ from constructs import Construct
 load_dotenv('.env.base')
 
 
-COMMON_LAYER_VERSION = 8
-AUTH_LAYER_VERSION = 8
+COMMON_LAYER_VERSION = 11
+AUTH_LAYER_VERSION = 11
 
 class EmailProcessorStack(Stack):
     """
@@ -159,7 +159,8 @@ class EmailProcessorStack(Stack):
                 "STAGE": stage,
                 "BACKUP_BOOKING_EMAIL": os.getenv('BACKUP_BOOKING_EMAIL'),
                 "USER_EMAILS_TABLE_NAME": user_emails_table.table_name,
-                "DOMAIN_NAME": os.getenv('DOMAIN_NAME')
+                "DOMAIN_NAME": os.getenv('DOMAIN_NAME'),
+                "LLM_MODEL": os.getenv('LLM_MODEL', 'gpt-4o')
             }
         )
 

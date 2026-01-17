@@ -16,8 +16,11 @@ _secrets = aws_utils._secrets
 
 # Domain that identifies booking-agent addresses (e.g. "booking.vibecal.com")
 DOMAIN_NAME = os.getenv("DOMAIN_NAME")
+# LLM model to use for disambiguation
+LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4o")
 
 logger.info(f"DOMAIN_NAME: {DOMAIN_NAME}")
+logger.info(f"LLM_MODEL: {LLM_MODEL}")
 
 # Get table from aws_utils
 _user_email_table = aws_utils.user_emails_table
@@ -121,7 +124,7 @@ def _disambiguate_owner_with_llm(parsed_email: Dict[str, Any], candidate_emails:
         
         response = client.chat.completions.create(
             name="calendar-owner-disambiguation",
-            model="gpt-4o",
+            model=LLM_MODEL,
             messages=[system_msg, user_msg],
             response_format={"type": "json_object"},
             metadata=call_metadata,
